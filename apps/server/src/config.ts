@@ -23,7 +23,7 @@ export const JWT_SECRET = (() => {
   return secret
 })()
 export const CORS_ORIGINS = requireEnv('CORS_ORIGINS').split(',')
-export const DASHBOARD_URL = requireEnv('DASHBOARD_URL')
+export const DASHBOARD_URL = process.env.DASHBOARD_URL || ''
 export const PORT = requireEnvInt('PORT')
 
 // Database
@@ -38,7 +38,7 @@ export const REDIS_HOST = requireEnv('REDIS_HOST')
 export const REDIS_PORT = requireEnvInt('REDIS_PORT')
 
 // Audit
-export const LOG_DIR = requireEnv('SUPAPROXY_LOG_DIR')
+export const LOG_DIR = process.env.SUPAPROXY_LOG_DIR || './var/logs'
 
-// Default model for new workspaces
-export const DEFAULT_MODEL = requireEnv('DEFAULT_MODEL')
+// Default model for new workspaces (optional — model is set per-workspace)
+export const DEFAULT_MODEL = process.env.DEFAULT_MODEL || ''
