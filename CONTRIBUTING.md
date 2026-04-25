@@ -6,14 +6,14 @@ Thanks for your interest in contributing! This guide will help you get started.
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - pnpm 9+
 - Docker (for MySQL and Redis)
 
 ### Getting started
 
 ```bash
-git clone https://github.com/numstack/supaproxy.git
+git clone https://github.com/NumstackPtyLtd/supaproxy.git
 cd supaproxy
 pnpm install
 
@@ -22,25 +22,19 @@ docker compose up -d
 
 # Configure environment
 cp apps/server/.env.example apps/server/.env
-cp apps/web/.env.example apps/web/.env
+# Generate a JWT secret and set DB_PASSWORD
+openssl rand -hex 32  # paste as JWT_SECRET
 
-# Generate a JWT secret
-openssl rand -hex 32
-# Paste it into apps/server/.env as JWT_SECRET
-# Set DB_PASSWORD to match docker-compose.yaml
-
-# Start dev servers
-pnpm --filter @supaproxy/server dev   # Backend on :3001
-pnpm --filter web dev                 # Dashboard on :4322
+# Start the server
+pnpm --filter @supaproxy/server dev   # API on :3001
 ```
 
 ### Project structure
 
 ```
 apps/server/     # Hono backend (API, agent, consumers)
-apps/web/        # Astro frontend (dashboard)
-packages/sdk/    # TypeScript SDK
-packages/shared/ # Shared types
+packages/sdk/    # TypeScript API client
+packages/shared/ # Shared types and entities
 ```
 
 ## Code style
@@ -49,18 +43,16 @@ All code rules are documented in `CLAUDE.md`. The key ones:
 
 - **No `any` types.** Create interfaces for all DB results and API responses.
 - **No env var fallbacks.** Use `requireEnv()` — it throws if missing.
-- **Auth in Hono, rendering in Astro.** No auth logic in the frontend.
-- **Max 200 lines per component.** Split into sub-components if needed.
-- **Every fetch in useEffect needs AbortController.** Abort on cleanup.
-- **No raw `setInterval`.** Use the `usePolling` hook.
+- **New API routes need Zod validation.** Use `parseBody()` from `middleware/validate.ts`.
 
 ## Pull request process
 
 1. Fork the repo and create a branch from `main`
 2. Make your changes
-3. Ensure TypeScript compiles: `npx tsc --noEmit -p apps/server/tsconfig.json`
-4. Run tests: `pnpm test`
-5. Open a PR against `main`
+3. Build shared packages: `pnpm --filter @supaproxy/shared build`
+4. Ensure TypeScript compiles: `npx tsc --noEmit -p apps/server/tsconfig.json`
+5. Run tests: `pnpm test`
+6. Open a PR against `main`
 
 ### PR checklist
 
@@ -68,11 +60,10 @@ All code rules are documented in `CLAUDE.md`. The key ones:
 - [ ] Tests pass
 - [ ] No `as any` or `: any` types introduced
 - [ ] New API routes have Zod input validation
-- [ ] New React islands wrapped in `<ErrorBoundary>`
 
 ## Commit messages
 
-Use concise imperative form: "Add workspace validation", "Fix XSS in markdown renderer", "Remove hardcoded model ID".
+Use concise imperative form: "Add workspace validation", "Fix cost estimation for unknown models", "Remove hardcoded model ID".
 
 ## `.claude/` directory
 
@@ -80,4 +71,4 @@ The `.claude/` directory contains Claude Code configuration — skills (dev auto
 
 ## Questions?
 
-Open a [GitHub Discussion](https://github.com/numstack/supaproxy/discussions) or file an issue.
+Open a [GitHub Discussion](https://github.com/NumstackPtyLtd/supaproxy/discussions) or file an issue.
