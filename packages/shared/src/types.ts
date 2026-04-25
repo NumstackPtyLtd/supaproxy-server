@@ -146,7 +146,7 @@ export interface AuditEntry {
 }
 
 // User session (from Azure AD via Auth.js)
-export interface ReclaimUser {
+export interface SupaproxyUser {
   id: string
   name: string
   email: string
