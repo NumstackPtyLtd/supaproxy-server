@@ -1,0 +1,17 @@
+{
+  "name": "supaproxy",
+  "private": true,
+  "license": "MIT",
+  "description": "AI assistant platform. Connect any MCP server, add Slack/WhatsApp/API consumers, get analytics.",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "turbo lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.8.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

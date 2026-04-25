@@ -1,0 +1,25 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: supaproxy-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MYSQL_DATABASE: supaproxy
+    ports:
+      - "3308:3306"
+    volumes:
+      - supaproxy-mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    container_name: supaproxy-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - supaproxy-redis-data:/data
+
+volumes:
+  supaproxy-mysql-data:
+  supaproxy-redis-data:
