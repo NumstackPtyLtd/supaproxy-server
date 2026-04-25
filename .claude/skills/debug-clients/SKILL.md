@@ -11,10 +11,17 @@ description: >
 
 Diagnose why a consumer is not receiving or responding to messages. Works for any consumer type.
 
+## Step 0: Load DB password
+
+```bash
+# Read DB_PASSWORD from the root .env (used by docker-compose)
+export DB_PASSWORD=$(grep DB_PASSWORD "$(git rev-parse --show-toplevel)/.env" | cut -d= -f2)
+```
+
 ## Step 1: Identify the consumer type and config
 
 ```bash
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -e "
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -e "
   SELECT c.id, c.type, c.status, c.workspace_id, c.config
   FROM consumers c
   ORDER BY c.type;" 2>&1 | grep -v Warning
@@ -28,8 +35,8 @@ Note the `type`, `status`, and `config` for the failing consumer.
 
 ```bash
 # Get tokens
-BOT_TOKEN=$(docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -N -e "SELECT value FROM org_settings WHERE key_name = 'slack_bot_token' LIMIT 1" 2>/dev/null)
-APP_TOKEN=$(docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -N -e "SELECT value FROM org_settings WHERE key_name = 'slack_app_token' LIMIT 1" 2>/dev/null)
+BOT_TOKEN=$(docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -N -e "SELECT value FROM org_settings WHERE key_name = 'slack_bot_token' LIMIT 1" 2>/dev/null)
+APP_TOKEN=$(docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -N -e "SELECT value FROM org_settings WHERE key_name = 'slack_app_token' LIMIT 1" 2>/dev/null)
 
 # Verify auth
 curl -s -H "Authorization: Bearer $BOT_TOKEN" https://slack.com/api/auth.test | python3 -m json.tool
@@ -67,7 +74,7 @@ curl -s -X POST https://slack.com/api/chat.postMessage \
 
 ```bash
 # Verify the consumer's config has the correct channel/endpoint
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -e "
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -e "
   SELECT c.type, w.name as workspace, c.config
   FROM consumers c
   JOIN workspaces w ON c.workspace_id = w.id;" 2>&1 | grep -v Warning

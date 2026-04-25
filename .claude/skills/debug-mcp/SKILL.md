@@ -11,11 +11,17 @@ description: >
 
 Diagnose why MCP connections fail to discover tools or why the agent cannot use them at runtime.
 
+## Step 0: Load DB password
+
+```bash
+export DB_PASSWORD=$(grep DB_PASSWORD "$(git rev-parse --show-toplevel)/.env" | cut -d= -f2)
+```
+
 ## Step 1: Check the MCP server is reachable
 
 ```bash
 # Get the connection URL from DB
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -N -e "SELECT name, config FROM connections;" 2>&1 | grep -v Warning
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -N -e "SELECT name, config FROM connections;" 2>&1 | grep -v Warning
 
 # Test the URL directly with a tools/list call
 URL="<url from above>"
@@ -46,7 +52,7 @@ curl -s -X POST "$URL" \
 ## Step 2: Check tools are registered in DB
 
 ```bash
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -e "
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -e "
   SELECT c.name, c.status, COUNT(t.id) as tools
   FROM connections c
   LEFT JOIN connection_tools t ON c.id = t.connection_id
@@ -75,7 +81,7 @@ If tools are stale or missing, delete and re-add the connection, or:
 
 ```bash
 CONN_ID="<connection_id>"
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -e "
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -e "
   DELETE FROM connection_tools WHERE connection_id = '${CONN_ID}';
   UPDATE connections SET status = 'disconnected' WHERE id = '${CONN_ID}';" 2>&1 | grep -v Warning
 ```
@@ -91,6 +97,6 @@ Check which transport `agent.ts` uses for the connection:
 
 ```bash
 # View raw connection configs
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -e "
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -e "
   SELECT name, type, config FROM connections;" 2>&1 | grep -v Warning
 ```
