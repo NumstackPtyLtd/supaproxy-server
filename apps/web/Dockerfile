@@ -18,7 +18,10 @@ COPY packages/shared/ packages/shared/
 COPY packages/sdk/ packages/sdk/
 COPY apps/web/ apps/web/
 
-# Build Astro
+# Build Astro — PUBLIC_ vars must be baked in at build time (Vite inlines them)
+ARG PUBLIC_SUPAPROXY_API_URL=http://localhost:3001
+ENV PUBLIC_SUPAPROXY_API_URL=$PUBLIC_SUPAPROXY_API_URL
+
 WORKDIR /app/apps/web
 RUN pnpm build
 

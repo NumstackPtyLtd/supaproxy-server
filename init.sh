@@ -45,7 +45,12 @@ EOF
   echo "  JWT_SECRET: (auto-generated)"
   echo "  DB_PASSWORD: (auto-generated)"
   echo ""
-  echo "  → Set DEFAULT_MODEL to your preferred model ID"
+  echo ""
+  read -rp "  Default model for new workspaces (e.g. gpt-4o, claude-sonnet-4-20250514) [gpt-4o]: " MODEL_INPUT
+  DEFAULT_MODEL="${MODEL_INPUT:-gpt-4o}"
+  sed -i.bak "s/^DEFAULT_MODEL=$/DEFAULT_MODEL=${DEFAULT_MODEL}/" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
+  echo "  DEFAULT_MODEL: ${DEFAULT_MODEL}"
+  echo ""
   echo "  → Add your AI API key in the dashboard after first login"
 fi
 

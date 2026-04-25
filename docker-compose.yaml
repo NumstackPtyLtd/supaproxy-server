@@ -54,12 +54,12 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        PUBLIC_SUPAPROXY_API_URL: http://localhost:3001
     container_name: supaproxy-web
     restart: unless-stopped
     ports:
       - "4322:4322"
-    environment:
-      PUBLIC_SUPAPROXY_API_URL: http://localhost:3001
     depends_on:
       - server
 

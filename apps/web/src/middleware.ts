@@ -3,7 +3,7 @@ import { logWarn } from './lib/logger';
 
 const PUBLIC_PATHS = ['/', '/login', '/signup', '/docs'];
 const API_URL = import.meta.env.PUBLIC_SUPAPROXY_API_URL;
-if (!API_URL) throw new Error('Missing required environment variable: SUPAPROXY_API_URL. Add it to your .env file (see .env.example for reference).');
+if (!API_URL) throw new Error('Missing required environment variable: PUBLIC_SUPAPROXY_API_URL. Add it to your .env file (see .env.example for reference).');
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url;
