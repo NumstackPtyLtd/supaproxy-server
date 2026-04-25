@@ -5,7 +5,7 @@ import { cors } from 'hono/cors'
 import pino from 'pino'
 import { getPool } from './db/pool.js'
 import { runMigrations } from './db/migrations.js'
-import { CORS_ORIGINS, DASHBOARD_URL, PORT, DEFAULT_MODEL } from './config.js'
+import { CORS_ORIGINS, DASHBOARD_URL, PORT } from './config.js'
 import type { CountRow, ValueRow, ModelRow } from './db/types.js'
 
 // Route modules
@@ -55,12 +55,8 @@ app.get('/api/models', async (c) => {
     // Table may not exist yet — fall through to fallback
     log.warn({ error: err instanceof Error ? err.message : err }, 'Models table query failed, using fallback')
   }
-  // Fallback: return configured default model
-  return c.json({
-    models: [
-      { id: DEFAULT_MODEL, label: 'Default', is_default: true },
-    ],
-  })
+  // Models table not yet seeded — return empty list
+  return c.json({ models: [] })
 })
 
 // Mount route modules
