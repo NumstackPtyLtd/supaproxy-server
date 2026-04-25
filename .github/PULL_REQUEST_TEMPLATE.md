@@ -8,7 +8,6 @@
 - [ ] Tests pass (`pnpm test`)
 - [ ] No `as any` or `: any` types introduced
 - [ ] New API routes have Zod input validation
-- [ ] New React islands wrapped in `<ErrorBoundary>`
 - [ ] No hardcoded env var fallbacks
 
 ## Test plan
