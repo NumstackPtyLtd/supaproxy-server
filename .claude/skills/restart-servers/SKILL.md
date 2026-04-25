@@ -24,7 +24,7 @@ description: >
 
 ```bash
 pkill -f "tsx.*index.ts" 2>/dev/null; sleep 1
-cd /Users/Elvis/workspace/supaproxy/apps/server && nohup ../../apps/server/node_modules/.bin/tsx src/index.ts > /tmp/supaproxy-server.log 2>&1 &
+REPO_ROOT=$(git rev-parse --show-toplevel) && cd "$REPO_ROOT/apps/server" && nohup npx tsx src/index.ts > /tmp/supaproxy-server.log 2>&1 &
 sleep 5
 curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health
 # Must be 200

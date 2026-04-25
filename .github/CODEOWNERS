@@ -4,8 +4,5 @@
 # Server
 apps/server/ @kopahead
 
-# Frontend
-apps/web/ @kopahead
-
 # Packages
 packages/ @kopahead

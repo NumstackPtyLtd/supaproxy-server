@@ -27,6 +27,5 @@ What actually happened. Include error messages or screenshots if relevant.
 ## Environment
 
 - OS: [e.g. macOS 14, Ubuntu 22.04]
-- Node.js version: [e.g. 20.11]
-- Browser (if frontend): [e.g. Chrome 124]
+- Node.js version: [e.g. 22.x]
 - SupaProxy version/commit: [e.g. v0.1.0 or commit hash]
