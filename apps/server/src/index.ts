@@ -16,6 +16,7 @@ import workspacesRouter from './routes/workspaces.js'
 import conversationsRouter from './routes/conversations.js'
 import connectorsRouter from './routes/connectors.js'
 import queryRouter from './routes/query.js'
+import docs from './openapi.js'
 
 const log = pino({ name: 'supaproxy' })
 
@@ -83,6 +84,9 @@ app.route('/', workspacesRouter)
 app.route('/', conversationsRouter)
 app.route('/', connectorsRouter)
 app.route('/', queryRouter)
+
+// API docs (mounted last — spec-only routes for /docs, /api/openapi.json, /public/*)
+app.route('/', docs)
 
 // --- Start ---
 const [wsCount] = await pool.execute<CountRow[]>('SELECT COUNT(*) as c FROM workspaces WHERE status = "active"')
