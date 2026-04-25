@@ -13,21 +13,25 @@ Thanks for your interest in contributing! This guide will help you get started.
 ### Getting started
 
 ```bash
-git clone https://github.com/NumstackPtyLtd/supaproxy.git
-cd supaproxy
+git clone https://github.com/NumstackPtyLtd/supaproxy-server.git
+cd supaproxy-server
 pnpm install
 
 # Start MySQL + Redis
-docker compose up -d
+docker compose up -d mysql redis
 
 # Configure environment
 cp apps/server/.env.example apps/server/.env
-# Generate a JWT secret and set DB_PASSWORD
-openssl rand -hex 32  # paste as JWT_SECRET
+# Edit apps/server/.env:
+#   JWT_SECRET — generate with: openssl rand -hex 32
+#   DB_PASSWORD — must match what MySQL started with. Check with:
+#     docker inspect supaproxy-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | grep MYSQL_ROOT
 
 # Start the server
 pnpm --filter @supaproxy/server dev   # API on :3001
 ```
+
+> **Two .env files**: The root `.env` is for docker-compose (service names, internal ports). `apps/server/.env` is for local dev (127.0.0.1, mapped ports 3308/6380). See `.env.example` for the local dev template.
 
 ### Project structure
 
@@ -71,4 +75,4 @@ The `.claude/` directory contains Claude Code configuration — skills (dev auto
 
 ## Questions?
 
-Open a [GitHub Discussion](https://github.com/NumstackPtyLtd/supaproxy/discussions) or file an issue.
+Open a [GitHub Discussion](https://github.com/NumstackPtyLtd/supaproxy-server/discussions) or file an issue.

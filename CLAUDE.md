@@ -47,18 +47,21 @@ packages/
 
 | Repo | Visibility | Purpose |
 |---|---|---|
-| supaproxy (this) | Public (MIT) | Engine: API server, SDK, shared types |
+| supaproxy-server (this) | Public (MIT) | Engine: API server, SDK, shared types |
 | supaproxy-dashboard | Private | Astro + React frontend |
 | supaproxy | Private | Internal team docs |
 
 ## Start Dev
 
 ```bash
-docker compose up -d                    # MySQL + Redis
+docker compose up -d mysql redis        # MySQL + Redis
 pnpm install                            # Dependencies
-cd apps/server && cp .env.example .env  # Configure env vars
-./apps/server/node_modules/.bin/tsx apps/server/src/index.ts
+cp apps/server/.env.example apps/server/.env  # Configure env vars
+# Edit apps/server/.env: set JWT_SECRET and DB_PASSWORD (see .env.example for details)
+pnpm --filter @supaproxy/server dev     # API on :3001
 ```
+
+> **Two .env files**: Root `.env` is for docker-compose (service names `mysql`/`redis`, internal ports 3306/6379). `apps/server/.env` is for local dev (127.0.0.1, mapped ports 3308/6380). `DB_PASSWORD` must match between them.
 
 ## Stack
 
