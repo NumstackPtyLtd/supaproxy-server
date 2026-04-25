@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.turbo/
+.env
+.env.local
+var/
+*.log
+.DS_Store
+.claude/settings.json
+.claude/settings.local.json
+_git/
