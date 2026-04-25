@@ -4,17 +4,24 @@ description: >
   Diagnose consumer/client connectivity issues. Covers any consumer type:
   Slack, WhatsApp, API, CLI, or future integrations. Checks token validity,
   channel/endpoint bindings, consumer startup lifecycle, and message flow.
-  Run when a consumer isn't receiving or responding to messages.
+  Run when a consumer is not receiving or responding to messages.
 ---
 
 # Debug Clients (Consumers)
 
-Diagnose why a consumer isn't receiving or responding to messages. Works for any consumer type.
+Diagnose why a consumer is not receiving or responding to messages. Works for any consumer type.
+
+## Step 0: Load DB password
+
+```bash
+# Read DB_PASSWORD from the root .env (used by docker-compose)
+export DB_PASSWORD=$(grep DB_PASSWORD "$(git rev-parse --show-toplevel)/.env" | cut -d= -f2)
+```
 
 ## Step 1: Identify the consumer type and config
 
 ```bash
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -e "
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -e "
   SELECT c.id, c.type, c.status, c.workspace_id, c.config
   FROM consumers c
   ORDER BY c.type;" 2>&1 | grep -v Warning
@@ -28,8 +35,8 @@ Note the `type`, `status`, and `config` for the failing consumer.
 
 ```bash
 # Get tokens
-BOT_TOKEN=$(docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -N -e "SELECT value FROM org_settings WHERE key_name = 'slack_bot_token' LIMIT 1" 2>/dev/null)
-APP_TOKEN=$(docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -N -e "SELECT value FROM org_settings WHERE key_name = 'slack_app_token' LIMIT 1" 2>/dev/null)
+BOT_TOKEN=$(docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -N -e "SELECT value FROM org_settings WHERE key_name = 'slack_bot_token' LIMIT 1" 2>/dev/null)
+APP_TOKEN=$(docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -N -e "SELECT value FROM org_settings WHERE key_name = 'slack_app_token' LIMIT 1" 2>/dev/null)
 
 # Verify auth
 curl -s -H "Authorization: Bearer $BOT_TOKEN" https://slack.com/api/auth.test | python3 -m json.tool
@@ -37,7 +44,7 @@ curl -s -H "Authorization: Bearer $BOT_TOKEN" https://slack.com/api/auth.test | 
 # Check Socket Mode (required for receiving events)
 curl -s -X POST https://slack.com/api/apps.connections.open \
   -H "Authorization: Bearer $APP_TOKEN" | python3 -m json.tool
-# If response contains "Socket Mode is not turned on" → enable in Slack app settings
+# If response contains "Socket Mode is not turned on" -> enable in Slack app settings
 
 # Check which channels the bot is in
 curl -s -H "Authorization: Bearer $BOT_TOKEN" "https://slack.com/api/users.conversations?types=public_channel,private_channel&limit=100" | python3 -c "
@@ -55,10 +62,10 @@ curl -s -X POST https://slack.com/api/chat.postMessage \
 ```
 
 ### For API consumers
-- API consumers are stateless — they work if the server is running
+- API consumers are stateless -- they work if the server is running
 - Test: `curl -s -X POST http://localhost:3001/api/workspaces/<id>/query -H "Content-Type: application/json" -d '{"query":"test"}'`
 
-### For WhatsApp / future consumers
+### For future consumers (WhatsApp, Discord, etc.)
 - Check the consumer-specific integration config in the consumer's `config` JSON
 - Verify webhook URLs are reachable from the external service
 - Check server logs for connection errors
@@ -67,7 +74,7 @@ curl -s -X POST https://slack.com/api/chat.postMessage \
 
 ```bash
 # Verify the consumer's config has the correct channel/endpoint
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -e "
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -e "
   SELECT c.type, w.name as workspace, c.config
   FROM consumers c
   JOIN workspaces w ON c.workspace_id = w.id;" 2>&1 | grep -v Warning
@@ -75,13 +82,13 @@ docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -e "
 
 The consumer's config must include the channel ID (Slack), phone number (WhatsApp), or endpoint (API) that maps to a workspace.
 
-## Step 4: CRITICAL — Consumer lifecycle
+## Step 4: CRITICAL -- Consumer lifecycle
 
 **Consumers that use persistent connections (Slack Socket Mode, WebSocket-based) only start at server boot.**
 
 The server reads consumer tokens from `org_settings` at startup (`index.ts`). If you:
-- Add tokens via the UI → consumer does NOT auto-start
-- Change tokens via the UI → old consumer keeps running with old tokens
+- Add tokens after startup -- consumer does NOT auto-start
+- Change tokens after startup -- old consumer keeps running with old tokens
 
 **Fix: Restart the SupaProxy server after any token change.**
 
@@ -103,26 +110,25 @@ strings /tmp/supaproxy-server.log | grep -i "<consumer_type>\|mention\|message\|
 ```
 
 Look for:
-- `app_mention received` / `message received` — event came in
-- `No workspace found for channel` — channel not bound
-- `Reply posted` — response sent successfully
-- `MCP connection failed` — tool connection issue (run `/debug-mcp`)
-- `Agent error` — AI provider issue (check API key in Settings)
+- `app_mention received` / `message received` -- event came in
+- `No workspace found for channel` -- channel not bound
+- `Reply posted` -- response sent successfully
+- `MCP connection failed` -- tool connection issue (run `/debug-mcp`)
+- `Agent error` -- AI provider issue (check API key in org settings)
 
 ## Step 6: Verify the full message flow
 
-A message goes through: **Consumer → Workspace lookup → Agent (AI + MCP tools) → Response**
+A message goes through: **Consumer -> Workspace lookup -> Agent (AI + MCP tools) -> Response**
 
-1. Consumer receives message ✓ (Step 2)
-2. Channel bound to workspace ✓ (Step 3)
-3. Workspace has connections ✓ (`/debug-mcp`)
-4. AI provider key configured ✓ (Settings > Integrations)
-5. Response posted back ✓ (Step 5 logs)
+1. Consumer receives message (Step 2)
+2. Channel bound to workspace (Step 3)
+3. Workspace has connections (`/debug-mcp`)
+4. AI provider key configured (org_settings)
+5. Response posted back (Step 5 logs)
 
 If step 3 or 4 fails, the agent returns an error but the consumer may not surface it clearly.
 
 ## Provider-agnostic rules
 
 - Never reference specific provider names in error messages or logs shown to users
-- Consumer types are registry-driven (`lib/registries/consumers.ts`) — adding a new type is a one-file change
-- The diagnostic steps above work for ANY consumer — adapt the connectivity check (Step 2) to the consumer's protocol
+- The diagnostic steps above work for ANY consumer -- adapt the connectivity check (Step 2) to the consumer's protocol

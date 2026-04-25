@@ -8,8 +8,9 @@
     "outDir": "dist",
     "rootDir": "src",
     "declaration": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true
+    "declarationMap": true,
+    "sourceMap": true,
+    "skipLibCheck": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
