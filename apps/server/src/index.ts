@@ -25,21 +25,33 @@ await runMigrations(pool)
 
 // --- Hono app ---
 const app = new Hono()
-app.use('*', cors({ origin: CORS_ORIGINS, credentials: true }))
+app.use('*', cors({
+  origin: (origin) => CORS_ORIGINS.includes(origin) ? origin : CORS_ORIGINS[0],
+  credentials: true,
+}))
+app.onError((err, c) => {
+  log.error({ error: err.message, stack: err.stack }, 'Unhandled error')
+  return c.json({ error: 'Internal Server Error' }, 500)
+})
 
 // Health check
 app.get('/health', async (c) => {
-  const [orgRows] = await pool.execute<CountRow[]>('SELECT COUNT(*) as c FROM organisations')
-  const [wsRows] = await pool.execute<CountRow[]>('SELECT COUNT(*) as c FROM workspaces WHERE status = "active"')
-  const [aiRows] = await pool.execute<ValueRow[]>("SELECT value FROM org_settings WHERE key_name IN ('ai_api_key', 'anthropic_api_key') AND value IS NOT NULL AND value != '' LIMIT 1")
-  const [connRows] = await pool.execute<CountRow[]>("SELECT COUNT(*) as c FROM connections WHERE status = 'connected'")
-  return c.json({
-    status: 'ok',
-    setup_complete: orgRows[0].c > 0,
-    workspaces: wsRows[0].c,
-    ai_configured: aiRows[0]?.value ? true : false,
-    connections: connRows[0].c,
-  })
+  try {
+    const [orgRows] = await pool.execute<CountRow[]>('SELECT COUNT(*) as c FROM organisations')
+    const [wsRows] = await pool.execute<CountRow[]>('SELECT COUNT(*) as c FROM workspaces WHERE status = "active"')
+    const [aiRows] = await pool.execute<ValueRow[]>("SELECT value FROM org_settings WHERE key_name IN ('ai_api_key', 'anthropic_api_key') AND value IS NOT NULL AND value != '' LIMIT 1")
+    const [connRows] = await pool.execute<CountRow[]>("SELECT COUNT(*) as c FROM connections WHERE status = 'connected'")
+    return c.json({
+      status: 'ok',
+      setup_complete: orgRows[0].c > 0,
+      workspaces: wsRows[0].c,
+      ai_configured: aiRows[0]?.value ? true : false,
+      connections: connRows[0].c,
+    })
+  } catch (err) {
+    log.error({ error: (err as Error).message }, 'Health check failed')
+    return c.json({ status: 'error', message: (err as Error).message }, 500)
+  }
 })
 
 // Models — served from DB in production, this is the bootstrap fallback

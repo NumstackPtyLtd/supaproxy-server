@@ -1,4 +1,4 @@
-// Reclaim shared types — used by both server and web
+// SupaProxy shared types — used by server, web, and SDK
 
 export interface WorkspaceConfig {
   workspace: {

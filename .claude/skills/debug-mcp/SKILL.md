@@ -9,13 +9,19 @@ description: >
 
 # Debug MCP Connections
 
-Diagnose why MCP connections fail to discover tools or why the agent can't use them at runtime.
+Diagnose why MCP connections fail to discover tools or why the agent cannot use them at runtime.
+
+## Step 0: Load DB password
+
+```bash
+export DB_PASSWORD=$(grep DB_PASSWORD "$(git rev-parse --show-toplevel)/.env" | cut -d= -f2)
+```
 
 ## Step 1: Check the MCP server is reachable
 
 ```bash
 # Get the connection URL from DB
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -N -e "SELECT name, config FROM connections;" 2>&1 | grep -v Warning
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -N -e "SELECT name, config FROM connections;" 2>&1 | grep -v Warning
 
 # Test the URL directly with a tools/list call
 URL="<url from above>"
@@ -27,75 +33,70 @@ curl -s -X POST "$URL" \
 
 ### Common failures:
 
-**"No routes found for /mcp"** — The MCP server doesn't have the HTTP route registered.
-- For Symfony apps: check `config/routes/mcp.yaml` exists with correct controller path
-- Controller must extend `AbstractController` for Symfony DI to inject dependencies
-- Run `docker exec <container> php bin/console cache:clear` after adding routes
+**"No routes found for /mcp"** -- The MCP server does not have the HTTP route registered.
+- Check the server framework's route configuration for the MCP endpoint
+- Clear any route caches after adding routes
 
-**"idempotency header not set"** — Server requires custom headers (e.g., `x-moo-request-id`).
+**"idempotency header not set"** -- Server requires custom headers (e.g., `x-moo-request-id`).
 - SupaProxy sends `x-moo-request-id` automatically on all MCP calls (agent.ts + connectors.ts)
 - If the server needs other headers, add them to the connection config: `cfg.headers`
 
-**Connection refused / timeout** — Docker port changed.
+**Connection refused / timeout** -- Docker port changed.
 - Docker ephemeral ports change on every container restart
 - Check current port: `docker ps --format '{{.Names}}\t{{.Ports}}' | grep <name>`
-- Update the connection URL in the SupaProxy UI or DB
+- Update the connection URL in the DB
 
-**"Too few arguments to function"** — Symfony DI not resolving dependencies.
-- Controller must extend `AbstractController` (not plain class)
-- Or explicitly register it in `config/services.yaml`
-- Run `docker exec <container> php bin/console debug:container <ClassName>` to verify registration
+**"Too few arguments to function"** -- Dependency injection not resolving.
+- Verify the MCP controller/handler is properly registered in the service container
 
 ## Step 2: Check tools are registered in DB
 
 ```bash
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -e "
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -e "
   SELECT c.name, c.status, COUNT(t.id) as tools
   FROM connections c
   LEFT JOIN connection_tools t ON c.id = t.connection_id
   GROUP BY c.id;" 2>&1 | grep -v Warning
 ```
 
-If status is `connected` but tools = 0, the test/save succeeded but tool discovery returned empty. Re-test the connection in the UI.
+If status is `connected` but tools = 0, the test/save succeeded but tool discovery returned empty. Re-test the connection.
 
 ## Step 3: Check agent runtime MCP calls
 
-If the UI shows tools but querying says "No tools available":
+If tools are registered but querying says "No tools available":
 
 ```bash
 # Check server logs for MCP connection errors
 strings /tmp/supaproxy-server.log | grep -i "mcp\|tools\|connection" | tail -20
 ```
 
-The agent (agent.ts) connects to MCP fresh on every query. Common issues:
-- **Missing headers at runtime** — agent.ts must send the same headers as connectors.ts
-- **MCP server crashed** between test and query — check Docker container is still running
-- **Port changed** — Docker ephemeral port rotated since the connection was saved
+The agent (`core/agent.ts`) connects to MCP fresh on every query. Common issues:
+- **Missing headers at runtime** -- agent.ts must send the same headers as connectors.ts
+- **MCP server crashed** between test and query -- check the Docker container is still running
+- **Port changed** -- Docker ephemeral port rotated since the connection was saved
 
 ## Step 4: Force re-discover tools
 
-If tools are stale or missing, delete and re-add the connection in the UI, or:
+If tools are stale or missing, delete and re-add the connection, or:
 
 ```bash
 CONN_ID="<connection_id>"
-docker exec supaproxy-mysql mysql -u root -psupaproxy2026 supaproxy -e "
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -e "
   DELETE FROM connection_tools WHERE connection_id = '${CONN_ID}';
   UPDATE connections SET status = 'disconnected' WHERE id = '${CONN_ID}';" 2>&1 | grep -v Warning
 ```
 
-Then re-test in the UI.
+Then re-test the connection.
 
-## Step 5: Restart insurance MCP (specific to this project)
+## Step 5: Verify agent.ts MCP transport
+
+Check which transport `agent.ts` uses for the connection:
+- **HTTP (streamable)**: uses `fetch()` with JSON-RPC -- verify URL and headers
+- **stdio**: uses `StdioClientTransport` -- verify the `command` and `args` in connection config
+- Connection config is stored as JSON in `connections.config` column
 
 ```bash
-cd /Users/Elvis/workspace/insurance
-git checkout MIM-519--slack-mcp-assistant-demo
-rm -rf var/cache/*
-docker compose up -d insurance nginx
-sleep 5
-PORT=$(docker ps --format '{{.Ports}}' --filter name=insurance-nginx | grep -o '0.0.0.0:[0-9]*' | cut -d: -f2)
-docker exec insurance php bin/console cache:clear
-echo "MCP URL: http://localhost:${PORT}/mcp"
+# View raw connection configs
+docker exec supaproxy-mysql mysql -u root -p"$DB_PASSWORD" supaproxy -e "
+  SELECT name, type, config FROM connections;" 2>&1 | grep -v Warning
 ```
-
-Then update the connection URL in SupaProxy to the new port.

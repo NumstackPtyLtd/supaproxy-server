@@ -13,13 +13,13 @@ Environment variables must be required. Silent fallbacks hide misconfiguration a
 
 ## The rule
 
-Every `process.env.X` and `import.meta.env.X` access must either:
+Every `process.env.X` access must either:
 1. Go through `requireEnv()` which throws if missing, OR
 2. Be used with an explicit check that throws/errors before use
 
 **Never** write:
 ```typescript
-// BAD — silent fallback
+// BAD -- silent fallback
 const API_URL = process.env.API_URL || 'http://localhost:3001'
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret'
 const CORS_ORIGINS = process.env.CORS_ORIGINS ?? 'http://localhost:4322'
@@ -27,7 +27,7 @@ const CORS_ORIGINS = process.env.CORS_ORIGINS ?? 'http://localhost:4322'
 
 **Always** write:
 ```typescript
-// GOOD — fails fast
+// GOOD -- fails fast
 const API_URL = requireEnv('API_URL')
 const JWT_SECRET = requireEnv('JWT_SECRET')
 ```
@@ -44,16 +44,6 @@ const requireEnv = (name: string): string => {
 }
 ```
 
-For the Astro frontend, the same pattern applies with `import.meta.env`:
-```typescript
-// BAD
-const API = import.meta.env.SUPAPROXY_API_URL || 'http://localhost:3001'
-
-// GOOD — throw at module load so the build fails early
-const API = import.meta.env.SUPAPROXY_API_URL
-if (!API) throw new Error('Missing SUPAPROXY_API_URL env var')
-```
-
 ## Audit
 
 Search for violations:
@@ -61,23 +51,27 @@ Search for violations:
 ```bash
 # Fallback patterns in server code
 grep -rn "process\.env\.\w* ||" apps/server/src/ --include="*.ts" | grep -v node_modules | grep -v '.env'
-grep -rn "process\.env\.\w* \?\?" apps/server/src/ --include="*.ts" | grep -v node_modules | grep -v '.env' | grep -v "PORT"
+grep -rn "process\.env\.\w* \?\?" apps/server/src/ --include="*.ts" | grep -v node_modules | grep -v '.env'
 
-# Fallback patterns in frontend code
-grep -rn "import\.meta\.env\.\w* ||" apps/web/src/ --include="*.ts" --include="*.astro" --include="*.tsx" | grep -v node_modules
+# Fallback patterns in packages
+grep -rn "process\.env\.\w* ||" packages/ --include="*.ts" | grep -v node_modules
+grep -rn "process\.env\.\w* \?\?" packages/ --include="*.ts" | grep -v node_modules
 
 # Hardcoded localhost anywhere
-grep -rn "http://localhost" apps/ --include="*.ts" --include="*.tsx" --include="*.astro" | grep -v node_modules | grep -v SKILL.md | grep -v ".env"
+grep -rn "http://localhost" apps/ packages/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md | grep -v ".env"
 ```
 
-## Exception
+## Exceptions
 
-`process.env.PORT ?? '3001'` is acceptable — PORT has a well-known convention and is the only env var where a fallback is tolerated.
+- `process.env.NODE_ENV ?? 'development'` is acceptable -- NODE_ENV has a well-known convention.
+- `process.env.DASHBOARD_URL || ''` is acceptable -- optional when running headless.
+- `process.env.DEFAULT_MODEL || ''` is acceptable -- model is set per-workspace.
+- `process.env.SUPAPROXY_LOG_DIR || './var/logs'` is acceptable -- logging directory has a sensible default.
 
 ## When you find a violation
 
 1. Remove the fallback
-2. Use `requireEnv()` for server code, or an explicit throw for frontend code
+2. Use `requireEnv()` from `apps/server/src/config.ts`
 3. Add the variable to `.env.example` with a placeholder value
 4. Verify the `.env` file has the real value set
 
