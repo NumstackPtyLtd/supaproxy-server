@@ -18,7 +18,7 @@ SupaProxy sits between your teams and your AI models. You bring the LLM (Anthrop
 - **Conversation lifecycle** — open → cold → closed with configurable timeouts and AI-generated follow-ups
 - **Post-conversation analysis** — sentiment, resolution status, knowledge gaps, compliance violations, fraud indicators
 - **Cost tracking** — per-query token counts, cost per conversation, monthly spend per workspace
-- **Dashboard** — real-time overview of everything flowing through the proxy
+- **SDK** — typed TypeScript client for building your own UI or integrations
 
 ## Quick start
 
@@ -30,81 +30,63 @@ cd supaproxy
 ./init.sh
 ```
 
-This generates secrets, builds containers, and starts everything. Once running:
+This generates secrets, builds containers, and starts the API server:
 
-- **Dashboard**: http://localhost:4322
 - **API**: http://localhost:3001
+- **Health check**: http://localhost:3001/health
 
-Visit http://localhost:4322/signup to create your organisation and first workspace.
+### Using the SDK
+
+```typescript
+import { SupaProxyClient } from '@supaproxy/sdk';
+
+const client = new SupaProxyClient('http://localhost:3001');
+const { workspaces } = await client.workspaces.list();
+const result = await client.workspaces.query('ws-my-workspace', {
+  query: 'What tickets are open?'
+});
+```
 
 ### Manual setup (without Docker)
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup with Node.js and pnpm.
 
-## Connect your MCP server
-
-In the dashboard, go to your workspace → **Connections** → **Add MCP Server**.
-
-**STDIO** (local):
-```
-Command: php
-Args: bin/console mcp:serve
-```
-
-**HTTP** (remote/production):
-```
-URL: https://your-service.example.com/mcp
-```
-
-The assistant discovers tools automatically and makes them available to users.
-
-## Add Slack
-
-1. Create a Slack app at [api.slack.com/apps](https://api.slack.com/apps)
-2. Enable **Socket Mode**, add `connections:write` scope to the App-Level Token
-3. Add Bot Token Scopes: `app_mentions:read`, `chat:write`, `reactions:write`, `groups:read`, `groups:history`, `im:history`, `im:read`
-4. Subscribe to bot events: `app_mention`, `message.groups`, `message.im`
-5. Install the app to your workspace
-6. In Supaproxy dashboard → **Settings** → paste the Bot Token and App Token
-7. Bind a channel to your workspace
-
 ## Architecture
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
-│   Slack /    │────▶│   Supaproxy    │────▶│   MCP Server    │
+│   Slack /    │────▶│   SupaProxy  │────▶│   MCP Server    │
 │   WhatsApp   │     │   Server     │     │   (your tools)  │
-│   API        │◀────│              │◀────│                 │
-└─────────────┘     └──────┬───────┘     └─────────────────┘
-                           │
-                    ┌──────▼───────┐
-                    │  Dashboard   │
-                    │  (Astro)     │
-                    └──────────────┘
+│   API / SDK  │◀────│              │◀────│                 │
+└─────────────┘     └──────────────┘     └─────────────────┘
 ```
 
-- **Server** — Node.js (Hono + BullMQ). Agent loop, MCP client, Slack consumer, lifecycle manager, conversation analysis
-- **Dashboard** — Astro + React + Tailwind. Workspace management, conversation viewer, analytics, settings
+- **Server** — Node.js (Hono + BullMQ). Agent loop, MCP client, consumers, lifecycle manager, conversation analysis
 - **Database** — MySQL 8. Conversations, messages, audit logs, stats, knowledge sources, guardrails
 - **Queue** — Redis + BullMQ. Cold messages, conversation stats generation
+- **SDK** — TypeScript client (`@supaproxy/sdk`) for building frontends and integrations
 
 ## Configuration
 
-See:
-- `apps/server/.env.example` — backend config
-- `apps/web/.env.example` — dashboard config
+See `apps/server/.env.example` for all environment variables.
 
 ## Tech stack
 
 | Component | Stack |
 |-----------|-------|
 | Server | Node.js, TypeScript, Hono, BullMQ |
-| Dashboard | Astro, React, Tailwind CSS |
 | Database | MySQL 8 |
 | Queue | Redis 7 |
 | AI | Any LLM (Anthropic, OpenAI, etc.) |
 | MCP | Model Context Protocol SDK |
-| Slack | Slack Bolt (Socket Mode) |
+| Consumers | Slack Bolt, API, SDK |
+
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| `@supaproxy/shared` | Shared types, entities, and API contracts |
+| `@supaproxy/sdk` | TypeScript API client (alpha) |
 
 ## Contributing
 

@@ -19,8 +19,7 @@ JWT_SECRET=${JWT_SECRET}
 
 # Server
 PORT=3001
-CORS_ORIGINS=http://localhost:4322,http://localhost:3001
-DASHBOARD_URL=http://localhost:4322
+CORS_ORIGINS=http://localhost:3001
 
 # MySQL
 DB_HOST=mysql
@@ -35,18 +34,12 @@ REDIS_PORT=6379
 
 # Audit logs
 SUPAPROXY_LOG_DIR=./var/logs
-
-# Default model for new workspaces (e.g. claude-sonnet-4-20250514, gpt-4o)
-DEFAULT_MODEL=
 EOF
 
   echo "✓ .env created"
   echo ""
   echo "  JWT_SECRET: (auto-generated)"
   echo "  DB_PASSWORD: (auto-generated)"
-  echo ""
-  echo "  → Set DEFAULT_MODEL to your preferred model ID"
-  echo "  → Add your AI API key in the dashboard after first login"
 fi
 
 echo ""
@@ -59,7 +52,8 @@ sleep 5
 
 echo ""
 echo "✓ SupaProxy is running"
-echo "  Dashboard: http://localhost:4322"
-echo "  API:       http://localhost:3001"
+echo "  API:          http://localhost:3001"
+echo "  Health check: http://localhost:3001/health"
 echo ""
-echo "Visit http://localhost:4322/signup to create your organisation."
+echo "Use the SDK or API to interact with SupaProxy."
+echo "Docs: https://github.com/NumstackPtyLtd/supaproxy/wiki"
