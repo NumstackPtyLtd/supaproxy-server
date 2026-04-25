@@ -50,6 +50,7 @@ JWT_SECRET=${JWT_SECRET}
 # Server
 PORT=3001
 CORS_ORIGINS=http://localhost:4322,http://localhost:3001
+DASHBOARD_URL=http://localhost:4322
 
 # MySQL (Docker, mapped to host port 3308)
 DB_HOST=127.0.0.1

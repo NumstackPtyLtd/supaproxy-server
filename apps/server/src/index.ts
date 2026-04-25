@@ -16,6 +16,7 @@ import workspacesRouter from './routes/workspaces.js'
 import conversationsRouter from './routes/conversations.js'
 import connectorsRouter from './routes/connectors.js'
 import queryRouter from './routes/query.js'
+import docs from './openapi.js'
 
 const log = pino({ name: 'supaproxy' })
 
@@ -74,6 +75,9 @@ app.get('/api/models', async (c) => {
     ],
   })
 })
+
+// API docs (Redoc)
+app.route('/', docs)
 
 // Mount route modules
 app.route('/', auth)
