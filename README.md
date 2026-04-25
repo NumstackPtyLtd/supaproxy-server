@@ -33,6 +33,8 @@ cd supaproxy-server
 This generates secrets, builds containers, and starts the API server:
 
 - **API**: http://localhost:3001
+- **API docs**: http://localhost:3001/docs
+- **OpenAPI spec**: http://localhost:3001/api/openapi.json (import into Postman, Insomnia, etc.)
 - **Health check**: http://localhost:3001/health
 
 ### Local dev (server on host, only MySQL/Redis in Docker)

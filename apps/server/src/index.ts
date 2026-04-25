@@ -76,9 +76,6 @@ app.get('/api/models', async (c) => {
   })
 })
 
-// API docs (Redoc)
-app.route('/', docs)
-
 // Mount route modules
 app.route('/', auth)
 app.route('/', org)
@@ -87,6 +84,9 @@ app.route('/', workspacesRouter)
 app.route('/', conversationsRouter)
 app.route('/', connectorsRouter)
 app.route('/', queryRouter)
+
+// API docs (mounted last — spec-only routes for /docs, /api/openapi.json, /public/*)
+app.route('/', docs)
 
 // --- Start ---
 const [wsCount] = await pool.execute<CountRow[]>('SELECT COUNT(*) as c FROM workspaces WHERE status = "active"')
