@@ -17,27 +17,24 @@ SupaProxy sits between your teams and your AI models. You bring the LLM (Anthrop
 
 ## Quick start
 
+Requires Docker.
+
 ```bash
-# 1. Clone and install
-git clone https://github.com/numstack/supaproxy.git
+git clone https://github.com/NumstackPtyLtd/supaproxy.git
 cd supaproxy
-pnpm install
-
-# 2. Start infrastructure
-docker compose up -d   # MySQL + Redis
-
-# 3. Configure
-cp apps/server/.env.example apps/server/.env
-cp apps/web/.env.example apps/web/.env
-# Edit .env files — generate a JWT secret and set DB_PASSWORD
-# openssl rand -hex 32  # for JWT_SECRET
-
-# 4. Run
-pnpm --filter @supaproxy/server dev   # Backend on :3001
-pnpm --filter web dev               # Dashboard on :4322
+./init.sh
 ```
 
-Visit `http://localhost:4322/signup` to create your organisation and first workspace.
+This generates secrets, builds containers, and starts everything. Once running:
+
+- **Dashboard**: http://localhost:4322
+- **API**: http://localhost:3001
+
+Visit http://localhost:4322/signup to create your organisation and first workspace.
+
+### Manual setup (without Docker)
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup with Node.js and pnpm.
 
 ## Connect your MCP server
 
@@ -86,11 +83,9 @@ The assistant discovers tools automatically and makes them available to users.
 - **Database** — MySQL 8. Conversations, messages, audit logs, stats, knowledge sources, guardrails
 - **Queue** — Redis + BullMQ. Cold messages, conversation stats generation
 
-## Documentation
+## Configuration
 
-Full docs (guides, API reference, deployment): [numstack.atlassian.net/wiki/spaces/SP](https://numstack.atlassian.net/wiki/spaces/SP)
-
-For configuration, see:
+See:
 - `apps/server/.env.example` — backend config
 - `apps/web/.env.example` — dashboard config
 
@@ -112,4 +107,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, code style, and PR process
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Maintained by [Numstack](https://numstack.com).
+MIT — see [LICENSE](LICENSE). Managed by Numstack Pty Ltd.
