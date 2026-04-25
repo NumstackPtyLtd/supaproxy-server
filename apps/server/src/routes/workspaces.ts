@@ -6,7 +6,7 @@ import { z } from 'zod'
 import pino from 'pino'
 import type { RowDataPacket } from 'mysql2'
 import { getPool } from '../db/pool.js'
-import { JWT_SECRET, DEFAULT_MODEL } from '../config.js'
+import { JWT_SECRET } from '../config.js'
 import { parseBody } from '../middleware/validate.js'
 import type {
   IdRow,
@@ -247,6 +247,7 @@ interface KnowledgeGapItem {
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(1, 'Workspace name is required').max(255),
+  model: z.string().min(1, 'Model is required').max(255),
   team_id: z.string().max(255).optional(),
   team_name: z.string().max(255).optional(),
   system_prompt: z.string().max(10000).optional(),
@@ -280,7 +281,7 @@ workspaces.post('/api/workspaces', async (c) => {
   const db = getPool()
   const result = await parseBody(c, createWorkspaceSchema)
   if (!result.success) return result.response
-  const { name, team_id, team_name, system_prompt, org_id } = result.data
+  const { name, model, team_id, team_name, system_prompt, org_id } = result.data
 
   // Resolve org_id
   let resolvedOrgId = org_id
@@ -328,7 +329,7 @@ workspaces.post('/api/workspaces', async (c) => {
   await db.execute(
     `INSERT INTO workspaces (id, org_id, team_id, name, status, model, system_prompt, max_tool_rounds)
      VALUES (?, ?, ?, ?, 'active', ?, ?, 10)`,
-    [wsId, resolvedOrgId || null, resolvedTeamId || null, name, DEFAULT_MODEL, system_prompt || 'You are a helpful assistant.']
+    [wsId, resolvedOrgId || null, resolvedTeamId || null, name, model, system_prompt || 'You are a helpful assistant.']
   )
 
   log.info({ workspace: wsId, name }, 'Workspace created')

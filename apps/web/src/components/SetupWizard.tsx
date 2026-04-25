@@ -102,6 +102,9 @@ export default function SetupWizard() {
           <Field label="Team">
             <Input value={form.wsTeam} onChange={setters.setWsTeam} placeholder="Engineering" />
           </Field>
+          <Field label="Model">
+            <Input value={form.wsModel} onChange={setters.setWsModel} placeholder="gpt-4o" />
+          </Field>
           <p className="text-[11px] mb-5" style={{ color: 'var(--text-muted)' }}>You can configure connections, knowledge, compliance, and prompts inside the workspace.</p>
           <button onClick={finish} disabled={saving}
             className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-[12px] font-medium shadow-lg shadow-black/20 disabled:opacity-50 transition-colors"

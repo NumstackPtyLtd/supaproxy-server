@@ -3,8 +3,8 @@ import pino from 'pino';
 import type { TextBlock } from '@anthropic-ai/sdk/resources/messages.js';
 import { transitionColdConversations, transitionClosedConversations, generateConversationStats } from './conversation.js';
 
-import { REDIS_HOST, REDIS_PORT, DEFAULT_MODEL } from '../config.js';
-import type { ValueRow } from '../db/types.js';
+import { REDIS_HOST, REDIS_PORT } from '../config.js';
+import type { ValueRow, WorkspaceRow } from '../db/types.js';
 
 const log = pino({ name: 'lifecycle' });
 
@@ -54,13 +54,23 @@ async function generateColdMessage(conversationId: string): Promise<string> {
     );
     if (!keyRows[0]?.value) return '';
 
+    const [wsRows] = await db.execute<WorkspaceRow[]>(
+      "SELECT w.model FROM workspaces w JOIN conversations c ON c.workspace_id = w.id WHERE c.id = ?",
+      [conversationId]
+    );
+    const model = wsRows[0]?.model;
+    if (!model) {
+      log.error({ conversationId }, 'No model configured for workspace — cold message skipped');
+      return '';
+    }
+
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const anthropic = new Anthropic({ apiKey: keyRows[0].value });
 
     const transcript = messages.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n\n');
 
     const response = await anthropic.messages.create({
-      model: DEFAULT_MODEL,
+      model,
       max_tokens: 150,
       messages: [{
         role: 'user',

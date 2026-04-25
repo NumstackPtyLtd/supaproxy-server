@@ -40,5 +40,3 @@ export const REDIS_PORT = requireEnvInt('REDIS_PORT')
 // Audit
 export const LOG_DIR = requireEnv('SUPAPROXY_LOG_DIR')
 
-// Default model for new workspaces
-export const DEFAULT_MODEL = requireEnv('DEFAULT_MODEL')

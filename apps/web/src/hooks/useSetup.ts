@@ -13,6 +13,7 @@ interface SetupFormData {
   adminPassword: string;
   wsName: string;
   wsTeam: string;
+  wsModel: string;
 }
 
 interface SetupFormSetters {
@@ -22,6 +23,7 @@ interface SetupFormSetters {
   setAdminPassword: (v: string) => void;
   setWsName: (v: string) => void;
   setWsTeam: (v: string) => void;
+  setWsModel: (v: string) => void;
 }
 
 interface SignupResponse {
@@ -53,6 +55,7 @@ export function useSetup(): UseSetupReturn {
   const [adminPassword, setAdminPassword] = useState('');
   const [wsName, setWsName] = useState('');
   const [wsTeam, setWsTeam] = useState('');
+  const [wsModel, setWsModel] = useState('');
 
   const validate = useCallback((s: number): boolean => {
     setValidationError('');
@@ -61,7 +64,7 @@ export function useSetup(): UseSetupReturn {
       if (!adminName || !adminEmail || !adminPassword) { setValidationError('All fields are required.'); return false; }
       if (adminPassword.length < 8) { setValidationError('Password must be at least 8 characters.'); return false; }
     }
-    if (s === 2 && (!wsName || !wsTeam)) { setValidationError('Workspace name and team are required.'); return false; }
+    if (s === 2 && (!wsName || !wsTeam || !wsModel)) { setValidationError('Workspace name, team, and model are required.'); return false; }
     return true;
   }, [orgName, adminName, adminEmail, adminPassword, wsName, wsTeam]);
 
@@ -82,6 +85,7 @@ export function useSetup(): UseSetupReturn {
         admin_password: adminPassword,
         workspace_name: wsName,
         team_name: wsTeam,
+        model: wsModel,
       });
       setSubmitState({ status: 'success' });
       setStep(3);
@@ -92,12 +96,12 @@ export function useSetup(): UseSetupReturn {
       setValidationError(msg);
       setSubmitState({ status: 'error', message: msg });
     }
-  }, [orgName, adminName, adminEmail, adminPassword, wsName, wsTeam, validate]);
+  }, [orgName, adminName, adminEmail, adminPassword, wsName, wsTeam, wsModel, validate]);
 
   return {
     step,
-    form: { orgName, adminName, adminEmail, adminPassword, wsName, wsTeam },
-    setters: { setOrgName, setAdminName, setAdminEmail, setAdminPassword, setWsName, setWsTeam },
+    form: { orgName, adminName, adminEmail, adminPassword, wsName, wsTeam, wsModel },
+    setters: { setOrgName, setAdminName, setAdminEmail, setAdminPassword, setWsName, setWsTeam, setWsModel },
     submitState,
     validationError,
     next,

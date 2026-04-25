@@ -6,7 +6,7 @@ import { z } from 'zod'
 import pino from 'pino'
 import { getPool } from '../db/pool.js'
 import { findUserByEmail, verifyPassword, hashPassword } from '../auth/db.js'
-import { JWT_SECRET, DASHBOARD_URL, IS_PRODUCTION, DEFAULT_MODEL } from '../config.js'
+import { JWT_SECRET, DASHBOARD_URL, IS_PRODUCTION } from '../config.js'
 import { parseBody } from '../middleware/validate.js'
 import type { IdRow } from '../db/types.js'
 
@@ -21,6 +21,7 @@ const signupSchema = z.object({
   admin_password: z.string().min(8, 'Password must be at least 8 characters').max(255),
   workspace_name: z.string().min(1, 'Workspace name is required').max(255),
   team_name: z.string().min(1, 'Team name is required').max(255),
+  model: z.string().min(1, 'Model is required').max(255),
   system_prompt: z.string().max(10000).optional(),
 })
 
@@ -31,7 +32,7 @@ auth.post('/api/signup', async (c) => {
   const db = getPool()
   const result = await parseBody(c, signupSchema)
   if (!result.success) return result.response
-  const { org_name, admin_name, admin_email, admin_password, workspace_name, team_name, system_prompt } = result.data
+  const { org_name, admin_name, admin_email, admin_password, workspace_name, team_name, model, system_prompt } = result.data
 
   const [emailCheck] = await db.execute<IdRow[]>('SELECT id FROM users WHERE email = ?', [admin_email])
   if (emailCheck[0]) {
@@ -63,7 +64,7 @@ auth.post('/api/signup', async (c) => {
   await db.execute(
     `INSERT INTO workspaces (id, org_id, team_id, name, status, model, system_prompt, max_tool_rounds, created_by)
      VALUES (?, ?, ?, ?, 'active', ?, ?, 10, ?)`,
-    [wsId, orgId, teamId, workspace_name, DEFAULT_MODEL, system_prompt || 'You are a helpful assistant.', userId]
+    [wsId, orgId, teamId, workspace_name, model, system_prompt || 'You are a helpful assistant.', userId]
   )
 
   const token = jwt.sign(
