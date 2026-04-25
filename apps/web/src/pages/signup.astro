@@ -1,0 +1,34 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SetupWizard from '../components/SetupWizard';
+import { BRAND_NAME } from '../lib/brand';
+---
+
+<Layout title={`Sign up - ${BRAND_NAME}`}>
+  <div class="min-h-screen flex flex-col justify-center relative overflow-hidden" style="background: var(--bg);">
+
+    <div class="w-full max-w-[460px] mx-auto px-6 py-12 relative z-10">
+
+      <div class="rounded-xl p-8" style="background: var(--bg-card); border: 1px solid var(--border-color); box-shadow: 0 10px 40px var(--shadow);">
+
+        <!-- Brand mark -->
+        <div class="flex items-center gap-2.5 mb-8">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--btn-primary-bg);">
+            <span class="text-sm font-bold" style="color: var(--btn-primary-text);">S</span>
+          </div>
+          <span class="text-[15px] font-semibold" style="color: var(--text-heading);">{BRAND_NAME}</span>
+        </div>
+
+        <h1 class="text-2xl font-semibold mb-2" style="color: var(--text-heading);">Create your account</h1>
+        <p class="text-[13px] mb-6" style="color: var(--body);">Set up your org and connect your first AI proxy.</p>
+
+        <SetupWizard client:load />
+      </div>
+
+      <div class="mt-6 text-center">
+        <span class="text-[12px]" style="color: var(--body);">Already have an account?</span>
+        <a href="/login" class="text-[12px] font-medium ml-1" style="color: var(--text-heading);">Sign in</a>
+      </div>
+    </div>
+  </div>
+</Layout>

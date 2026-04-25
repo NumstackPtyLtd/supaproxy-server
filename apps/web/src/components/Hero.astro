@@ -1,0 +1,101 @@
+---
+---
+
+<section class="min-h-screen flex items-center relative overflow-hidden" style="background: var(--bg);">
+  <div class="relative max-w-[1280px] mx-auto px-6 py-24">
+    <div class="flex items-center gap-20">
+
+      <!-- Left: Copy -->
+      <div class="flex-1 min-w-0">
+        <a href="#" class="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-10 transition-colors" style="border: 1px solid var(--border-light); color: var(--body);">
+          <span class="text-[13px]">Open source</span>
+          <span style="color: var(--text-muted);">&rsaquo;</span>
+        </a>
+
+        <h1 class="text-[72px] font-normal leading-[1.05] tracking-tight mb-6 max-w-[640px]" style="font-family: 'Georgia', 'Times New Roman', serif; color: var(--text-heading);">
+          One proxy<br/>
+          for all your AI
+        </h1>
+
+        <p class="text-[17px] leading-relaxed mb-10 max-w-[480px]" style="color: var(--body);">
+          Route any AI model to any team. Add guardrails, track costs, detect fraud — all through one governed layer between your people and your LLMs.
+        </p>
+
+        <div class="flex gap-4 items-center">
+          <a href="/signup" class="px-5 py-2.5 rounded-lg text-[14px] font-medium transition-colors" style="background: var(--btn-primary-bg); color: var(--btn-primary-text);">
+            Get Started
+          </a>
+          <a href="https://numstack.atlassian.net/wiki/spaces/SP" target="_blank" rel="noopener" class="text-[14px] transition-colors" style="color: var(--body);">
+            Documentation
+          </a>
+        </div>
+
+        <div class="mt-16 flex gap-10">
+          <div>
+            <div class="text-[28px] font-bold" style="font-family: 'Georgia', serif; color: var(--text-heading);">5 min</div>
+            <div class="text-[11px] uppercase tracking-wider mt-1" style="color: var(--text-muted);">to first query</div>
+          </div>
+          <div class="w-px" style="background: var(--border-color);"></div>
+          <div>
+            <div class="text-[28px] font-bold" style="font-family: 'Georgia', serif; color: var(--text-heading);">0</div>
+            <div class="text-[11px] uppercase tracking-wider mt-1" style="color: var(--text-muted);">infra to build</div>
+          </div>
+          <div class="w-px" style="background: var(--border-color);"></div>
+          <div>
+            <div class="text-[28px] font-bold" style="font-family: 'Georgia', serif; color: var(--text-heading);">100%</div>
+            <div class="text-[11px] uppercase tracking-wider mt-1" style="color: var(--text-muted);">auditable</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Dashboard preview cards -->
+      <div class="hidden lg:flex flex-col gap-3 w-[360px] flex-shrink-0">
+        <div class="rounded-xl p-5" style="background: var(--bg-card); border: 1px solid var(--border-color);">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--bg-surface); border: 1px solid var(--border-color);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-muted);"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div>
+              <div class="text-[13px] font-semibold" style="color: var(--text-heading);">Guardrails</div>
+              <div class="text-[11px]" style="color: var(--text-muted);">All queries governed</div>
+            </div>
+            <span class="ml-auto text-[11px] font-medium text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">0 violations</span>
+          </div>
+          <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--border-color);">
+            <div class="h-full bg-emerald-400 rounded-full" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <div class="rounded-xl p-5" style="background: var(--bg-card); border: 1px solid var(--border-color);">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--bg-surface); border: 1px solid var(--border-color);">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-muted);"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div>
+              <div class="text-[13px] font-semibold" style="color: var(--text-heading);">Cost MTD</div>
+              <div class="text-[11px]" style="color: var(--text-muted);">$12.40 of $50</div>
+            </div>
+          </div>
+          <div class="h-1.5 rounded-full overflow-hidden" style="background: var(--border-color);">
+            <div class="h-full rounded-full" style="width: 25%; background: var(--text-heading);"></div>
+          </div>
+        </div>
+
+        <div class="rounded-xl p-5" style="background: var(--bg-card); border: 1px solid var(--border-color);">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--bg-surface); border: 1px solid var(--border-color);">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-muted);"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+              <div>
+                <div class="text-[13px] font-semibold" style="color: var(--text-heading);">Sentiment</div>
+                <div class="text-[11px]" style="color: var(--text-muted);">Across 47 conversations</div>
+              </div>
+            </div>
+            <span class="text-[18px] font-bold text-emerald-400">4.2</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,16 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import Header from '../../../../components/Header.astro';
+import ConversationPage from '../../../../components/ConversationPage';
+
+const { id, cid } = Astro.params;
+---
+
+<Layout title="Conversation - SupaProxy">
+  <Header />
+  <main class="pt-12 min-h-screen" style="background: var(--bg-card)">
+    <div class="max-w-[1280px] mx-auto px-6 py-4">
+      <ConversationPage client:load workspaceId={id!} conversationId={cid!} />
+    </div>
+  </main>
+</Layout>

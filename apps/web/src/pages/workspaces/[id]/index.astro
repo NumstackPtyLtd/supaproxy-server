@@ -1,0 +1,16 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import Header from '../../../components/Header.astro';
+import WorkspaceDetail from '../../../components/WorkspaceDetail';
+
+const { id } = Astro.params;
+---
+
+<Layout title="Workspace - SupaProxy">
+  <Header />
+  <main class="pt-12 min-h-screen" style="background: var(--bg-card)">
+    <div class="max-w-[1280px] mx-auto px-6 py-4">
+      <WorkspaceDetail client:load workspaceId={id!} />
+    </div>
+  </main>
+</Layout>

@@ -1,0 +1,44 @@
+---
+import ThemeToggle from './shared/ThemeToggle';
+const API_URL = import.meta.env.PUBLIC_SUPAPROXY_API_URL;
+if (!API_URL) throw new Error('Missing required environment variable: PUBLIC_SUPAPROXY_API_URL');
+const user = Astro.locals.user;
+const initial = user?.name?.[0]?.toUpperCase() || '?';
+---
+
+<header class="fixed top-0 w-full z-50 backdrop-blur-md border-b" style="background: var(--header-bg); border-color: var(--border-color);">
+  <div class="max-w-[1280px] mx-auto px-6 h-12 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2">
+      <span class="text-[15px] font-semibold tracking-tight" style="font-family: 'Georgia', serif; font-style: italic; color: var(--text-heading);">SupaProxy</span>
+    </a>
+
+    <nav class="flex items-center gap-5">
+      {user && <a href="/workspaces" class="text-[13px] transition-colors" style="color: var(--body);">Workspaces</a>}
+      <a href="https://numstack.atlassian.net/wiki/spaces/SP" target="_blank" rel="noopener" class="text-[13px] transition-colors" style="color: var(--body);">Docs</a>
+
+      <ThemeToggle client:load />
+
+      {user ? (
+        <div class="relative group">
+          <button class="w-7 h-7 rounded-full text-[11px] font-semibold flex items-center justify-center cursor-pointer transition-colors" style="background: var(--bg-hover); border: 1px solid var(--border-color); color: var(--text-heading);">
+            {initial}
+          </button>
+          <div class="absolute right-0 top-full mt-1 w-48 rounded-lg shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50" style="background: var(--dropdown-bg); border: 1px solid var(--border-color);">
+            <div class="px-3 py-2" style="border-bottom: 1px solid var(--border-color);">
+              <div class="text-[12px] font-medium" style="color: var(--text-heading);">{user.name}</div>
+              <div class="text-[10px]" style="color: var(--text-muted);">{user.email}</div>
+            </div>
+            <a href="/settings" class="block px-3 py-2 text-[12px] transition-colors" style="color: var(--body);">Organisation settings</a>
+            <a href={`${API_URL}/api/auth/logout`} class="block px-3 py-2 text-[12px] transition-colors" style="color: var(--body); border-top: 1px solid var(--border-color);">Sign out</a>
+          </div>
+        </div>
+      ) : (
+        <div class="flex items-center gap-3">
+          <a href="/login" class="text-[13px] transition-colors" style="color: var(--body);">Log In</a>
+          <a href="/signup" class="text-[13px] font-medium px-4 py-1.5 rounded-lg transition-colors" style="background: var(--btn-primary-bg); color: var(--btn-primary-text);">Get Started</a>
+        </div>
+      )}
+    </nav>
+  </div>
+</header>
+

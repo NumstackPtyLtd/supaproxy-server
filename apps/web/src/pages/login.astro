@@ -1,0 +1,81 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { BRAND_NAME } from '../lib/brand';
+
+const API_URL = import.meta.env.PUBLIC_SUPAPROXY_API_URL;
+if (!API_URL) throw new Error('Missing required environment variable: PUBLIC_SUPAPROXY_API_URL');
+const error = Astro.url.searchParams.get('error');
+const errors: Record<string, string> = {
+  invalid_credentials: 'Invalid email or password',
+  missing_fields: 'Please enter both email and password',
+};
+---
+
+<Layout title={`Sign in - ${BRAND_NAME}`}>
+  <div class="min-h-screen flex flex-col justify-center relative overflow-hidden" style="background: var(--bg);">
+
+    <div class="w-full max-w-[400px] mx-auto px-6 relative z-10">
+
+      <div class="rounded-xl p-8" style="background: var(--bg-card); border: 1px solid var(--border-color); box-shadow: 0 10px 40px var(--shadow);">
+
+        <!-- Brand mark -->
+        <div class="flex items-center gap-2.5 mb-8">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--btn-primary-bg);">
+            <span class="text-sm font-bold" style="color: var(--btn-primary-text);">S</span>
+          </div>
+          <span class="text-[15px] font-semibold" style="color: var(--text-heading);">{BRAND_NAME}</span>
+        </div>
+
+        <h1 class="text-xl font-semibold mb-1" style="color: var(--text-heading);">Welcome back</h1>
+        <p class="text-[13px] mb-6" style="color: var(--body);">Sign in to manage your AI proxy</p>
+
+        {error && (
+          <div class="mb-4 py-2 text-[12px] text-error border-l-2 border-error pl-3">
+            {errors[error] || 'Authentication failed'}
+          </div>
+        )}
+
+        <!-- Microsoft -->
+        <a href="#" class="flex items-center justify-center gap-2.5 w-full py-2.5 rounded-lg text-[13px] font-medium transition-colors" style="background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-heading);">
+          <svg width="14" height="14" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg>
+          Sign in with Microsoft
+        </a>
+
+        <div class="flex items-center gap-3 my-5">
+          <div class="flex-1 h-px" style="background: var(--border-color);"></div>
+          <span class="text-[10px] uppercase tracking-wider" style="color: var(--text-muted);">or</span>
+          <div class="flex-1 h-px" style="background: var(--border-color);"></div>
+        </div>
+
+        <!--
+          CSRF protection: This form POSTs to the API server which sets
+          SameSite=Lax on the session cookie and validates the Origin header
+          via CORS (CORS_ORIGINS env var). No additional CSRF token is needed
+          because the combination of SameSite cookie + strict CORS origin
+          checking prevents cross-site form submissions.
+        -->
+        <form method="POST" action={`${API_URL}/api/auth/login`}>
+          <label class="block text-[11px] mb-1.5" style="color: var(--body);">Email</label>
+          <input type="email" name="email" required placeholder="you@company.com"
+            class="w-full px-3 py-2.5 rounded-lg text-[13px] focus:outline-none mb-4"
+            style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--input-text);" />
+
+          <label class="block text-[11px] mb-1.5" style="color: var(--body);">Password</label>
+          <input type="password" name="password" required placeholder="••••••••"
+            class="w-full px-3 py-2.5 rounded-lg text-[13px] focus:outline-none mb-5"
+            style="background: var(--input-bg); border: 1px solid var(--input-border); color: var(--input-text);" />
+
+          <button type="submit" class="w-full py-2.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer"
+            style="background: var(--btn-primary-bg); color: var(--btn-primary-text);">
+            Sign in
+          </button>
+        </form>
+      </div>
+
+      <div class="mt-6 text-center">
+        <span class="text-[12px]" style="color: var(--body);">No account yet?</span>
+        <a href="/signup" class="text-[12px] font-medium ml-1" style="color: var(--text-heading);">Sign up</a>
+      </div>
+    </div>
+  </div>
+</Layout>

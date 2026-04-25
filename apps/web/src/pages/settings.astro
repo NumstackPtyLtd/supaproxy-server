@@ -1,0 +1,17 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Header from '../components/Header.astro';
+import OrgSettings from '../components/OrgSettings';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login');
+---
+
+<Layout title="Settings - SupaProxy">
+  <Header />
+  <main class="pt-12 min-h-screen" style="background: var(--bg-card)">
+    <div class="max-w-[1280px] mx-auto px-6 py-4">
+      <OrgSettings client:load />
+    </div>
+  </main>
+</Layout>
