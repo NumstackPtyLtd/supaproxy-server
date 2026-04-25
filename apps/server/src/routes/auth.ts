@@ -85,23 +85,44 @@ auth.post('/api/signup', async (c) => {
 })
 
 // --- Login ---
+const loginSchema = z.object({
+  email: z.string().email('A valid email is required'),
+  password: z.string().min(1, 'Password is required'),
+})
+
 auth.post('/api/auth/login', async (c) => {
-  const body = await c.req.parseBody()
-  const email = body.email as string
-  const password = body.password as string
+  const contentType = c.req.header('content-type') || ''
+  const isFormSubmit = contentType.includes('form')
+
+  let email: string
+  let password: string
+
+  if (isFormSubmit) {
+    const body = await c.req.parseBody()
+    email = body.email as string
+    password = body.password as string
+  } else {
+    const result = await parseBody(c, loginSchema)
+    if (!result.success) return result.response
+    email = result.data.email
+    password = result.data.password
+  }
 
   if (!email || !password) {
-    return c.redirect(`${DASHBOARD_URL}/login?error=missing_fields`)
+    if (isFormSubmit && DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/login?error=missing_fields`)
+    return c.json({ error: 'Email and password are required.' }, 400)
   }
 
   const user = await findUserByEmail(email)
   if (!user) {
-    return c.redirect(`${DASHBOARD_URL}/login?error=invalid_credentials`)
+    if (isFormSubmit && DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/login?error=invalid_credentials`)
+    return c.json({ error: 'Invalid credentials.' }, 401)
   }
 
   const valid = await verifyPassword(password, user.password_hash)
   if (!valid) {
-    return c.redirect(`${DASHBOARD_URL}/login?error=invalid_credentials`)
+    if (isFormSubmit && DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/login?error=invalid_credentials`)
+    return c.json({ error: 'Invalid credentials.' }, 401)
   }
 
   const token = jwt.sign(
@@ -118,7 +139,11 @@ auth.post('/api/auth/login', async (c) => {
     maxAge: SESSION_MAX_AGE,
   })
 
-  return c.redirect(`${DASHBOARD_URL}/workspaces`)
+  if (isFormSubmit && DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/workspaces`)
+  return c.json({
+    status: 'ok',
+    user: { id: user.id, email: user.email, name: user.name, role: user.org_role },
+  })
 })
 
 // --- Session ---
@@ -145,7 +170,8 @@ auth.get('/api/auth/session', (c) => {
 // --- Logout ---
 auth.get('/api/auth/logout', (c) => {
   setCookie(c, 'supaproxy_session', '', { path: '/', maxAge: 0 })
-  return c.redirect(`${DASHBOARD_URL}/login`)
+  if (DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/login`)
+  return c.json({ status: 'ok' })
 })
 
 export default auth
