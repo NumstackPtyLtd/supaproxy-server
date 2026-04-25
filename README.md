@@ -1,5 +1,10 @@
 # SupaProxy
 
+[![CI](https://github.com/NumstackPtyLtd/supaproxy/actions/workflows/ci.yml/badge.svg)](https://github.com/NumstackPtyLtd/supaproxy/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](https://nodejs.org)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 **One proxy for all your AI.** Route any LLM to any team through one governed layer. Guardrails, cost tracking, fraud detection, conversation analytics — without building bot infrastructure.
 
 ## What it does
