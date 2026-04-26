@@ -46,6 +46,7 @@ src/
 | supaproxy-server (this) | Public (MIT) | Engine: API server |
 | supaproxy-sdk | Public (MIT) | TypeScript SDK (`@supaproxy/sdk` on npm) |
 | supaproxy-dashboard | Private | Astro + React frontend |
+| supaproxy-docs | Private | Mintlify documentation site |
 
 ## Start Dev
 
@@ -136,7 +137,8 @@ pnpm dev                           # API on :3001
 2. Make changes following the code rules above
 3. Run `/audit-code` to catch violations
 4. Run tests: `pnpm test`
-5. Open PR against `main`
+5. If the change affects API endpoints, request/response shapes, or user-facing behaviour: note which pages in [supaproxy-docs](https://github.com/NumstackPtyLtd/supaproxy-docs) need updating
+6. Open PR against `main`
 
 ### Adding a New Route
 Run `/add-api-route` or follow the pattern in `src/routes/`. Every route file:
