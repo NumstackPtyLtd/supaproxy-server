@@ -39,6 +39,28 @@ interface SlackAuthTestResponse {
   team?: string
 }
 
+/** Integration test handler — validates credentials for a consumer type */
+interface IntegrationTestResult {
+  ok: boolean
+  detail?: Record<string, unknown>
+  error?: string
+}
+
+type IntegrationTestFn = (credentials: Record<string, string>) => Promise<IntegrationTestResult>
+
+const integrationTesters: Record<string, IntegrationTestFn> = {
+  async slack(credentials) {
+    const botToken = credentials.bot_token
+    if (!botToken) return { ok: false, error: 'bot_token is required' }
+    const res = await fetch('https://slack.com/api/auth.test', {
+      headers: { Authorization: `Bearer ${botToken}` },
+    })
+    const data: SlackAuthTestResponse = await res.json()
+    if (!data.ok) return { ok: false, error: data.error }
+    return { ok: true, detail: { bot_name: data.user, team: data.team } }
+  },
+}
+
 const updateOrgSchema = z.object({
   name: z.string().min(1, 'Organisation name is required').max(255),
 })
@@ -47,8 +69,9 @@ const updateOrgSettingSchema = z.object({
   value: z.string().max(5000),
 })
 
-const slackTestSchema = z.object({
-  bot_token: z.string().min(1, 'Bot token is required').max(500),
+const integrationTestSchema = z.object({
+  type: z.string().min(1, 'Integration type is required'),
+  credentials: z.record(z.string().max(500)),
 })
 
 const org = new Hono<AuthEnv>()
@@ -94,8 +117,7 @@ org.put('/api/org/settings/:key', async (c) => {
   const result = await parseBody(c, updateOrgSettingSchema)
   if (!result.success) return result.response
   const { value } = result.data
-  const SECRET_KEYS = ['slack_bot_token', 'slack_app_token', 'anthropic_api_key', 'ai_api_key']
-  const isSecret = SECRET_KEYS.includes(key)
+  const isSecret = key.includes('token') || key.includes('secret') || key.includes('api_key') || key.includes('password')
 
   const [existing] = await db.execute<IdRow[]>('SELECT id FROM org_settings WHERE org_id = ? AND key_name = ?', [user.org_id, key])
   if (existing[0]) {
@@ -107,19 +129,22 @@ org.put('/api/org/settings/:key', async (c) => {
   return c.json({ status: 'ok' })
 })
 
-org.post('/api/org/integrations/slack/test', async (c) => {
-  const result = await parseBody(c, slackTestSchema)
+org.post('/api/org/integrations/test', async (c) => {
+  const result = await parseBody(c, integrationTestSchema)
   if (!result.success) return result.response
-  const { bot_token } = result.data
+  const { type, credentials } = result.data
+
+  const tester = integrationTesters[type]
+  if (!tester) {
+    return c.json({ error: `Unsupported integration type: ${type}` }, 400)
+  }
+
   try {
-    const res = await fetch('https://slack.com/api/auth.test', {
-      headers: { Authorization: `Bearer ${bot_token}` },
-    })
-    const data: SlackAuthTestResponse = await res.json()
-    if (!data.ok) return c.json({ error: `Slack error: ${data.error}` }, 400)
-    return c.json({ bot_name: data.user, team: data.team })
+    const testResult = await tester(credentials)
+    if (!testResult.ok) return c.json({ error: testResult.error }, 400)
+    return c.json(testResult.detail || { status: 'ok' })
   } catch {
-    return c.json({ error: 'Could not reach Slack' }, 400)
+    return c.json({ error: `Could not reach ${type} service` }, 400)
   }
 })
 

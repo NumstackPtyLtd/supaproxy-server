@@ -42,16 +42,16 @@ export type KnowledgeSource =
   | { type: 'file'; paths: string[] }
   | { type: 'inline'; content: string }
 
-export interface ConsumerConfig {
-  slack?: {
-    channels: string[]
-    allow_dms: boolean
-    thread_context: boolean
-  }
-  api?: {
-    endpoint: string
-    api_keys: string[]
-  }
+/** Per-consumer-type configuration. Keys are consumer type names. */
+export type ConsumerConfig = Record<string, ConsumerTypeConfig>
+
+export interface ConsumerTypeConfig {
+  channels?: string[]
+  allow_dms?: boolean
+  thread_context?: boolean
+  endpoint?: string
+  api_keys?: string[]
+  [key: string]: unknown
 }
 
 export interface PermissionsConfig {

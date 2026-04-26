@@ -23,9 +23,11 @@ export class Workspace {
   get maxToolRounds() { return this.config.max_tool_rounds }
   get maxThreadHistory() { return this.config.max_thread_history }
 
-  /** Check if a Slack channel is bound to this workspace */
+  /** Check if a channel is bound to this workspace for any consumer type */
   ownsChannel(channelId: string): boolean {
-    return this.consumers.slack?.channels.includes(channelId) ?? false
+    return Object.values(this.consumers).some(
+      (cfg) => cfg?.channels?.includes(channelId) ?? false
+    )
   }
 
   /** Check if a tool name matches the allowed patterns for a role */
@@ -84,7 +86,8 @@ export class WorkspaceRegistry {
           this.channelIndex.set(ch, ws.id)
         }
 
-        log.info({ workspace: ws.id, name: ws.name, tools: ws.mcpServers.length, channels: ws.consumers.slack?.channels.length ?? 0 },
+        const totalChannels = Object.values(ws.consumers).reduce((sum, cfg) => sum + (cfg?.channels?.length ?? 0), 0)
+        log.info({ workspace: ws.id, name: ws.name, tools: ws.mcpServers.length, channels: totalChannels },
           'Workspace loaded')
       } catch (err) {
         log.error({ file, error: (err as Error).message }, 'Failed to load workspace config')
