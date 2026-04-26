@@ -5,6 +5,7 @@ import type { RowDataPacket } from 'mysql2'
 import pino from 'pino'
 import { getPool } from '../db/pool.js'
 import { parseBody } from '../middleware/validate.js'
+import { requireAuth, type AuthEnv } from '../middleware/auth.js'
 import type { IdRow } from '../db/types.js'
 
 /** Slack auth.test API response */
@@ -72,7 +73,9 @@ const mcpSaveSchema = z.object({
 
 const log = pino({ name: 'routes/connectors' })
 
-const connectors = new Hono()
+const connectors = new Hono<AuthEnv>()
+
+connectors.use('/api/connectors/*', requireAuth)
 
 // Bind a Slack channel to a workspace (uses the org-wide bot)
 connectors.post('/api/connectors/slack-channel', async (c) => {

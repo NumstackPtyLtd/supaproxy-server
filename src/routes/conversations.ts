@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto'
 import type { RowDataPacket } from 'mysql2'
 import pino from 'pino'
 import { getPool } from '../db/pool.js'
+import { requireAuth, type AuthEnv } from '../middleware/auth.js'
 import type { ConversationRow, ConversationStatsRow, TotalRow } from '../db/types.js'
 
 /** JOIN of conversations + conversation_stats for list queries */
@@ -69,7 +70,9 @@ interface StatsStatusRow extends RowDataPacket {
 
 const log = pino({ name: 'routes/conversations' })
 
-const conversations = new Hono()
+const conversations = new Hono<AuthEnv>()
+
+conversations.use('/api/workspaces/*/conversations*', requireAuth)
 
 conversations.get('/api/workspaces/:id/conversations', async (c) => {
   const db = getPool()
