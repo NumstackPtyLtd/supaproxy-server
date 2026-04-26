@@ -8,18 +8,18 @@ import { parseBody } from '../middleware/validate.js'
 import { requireAuth, type AuthEnv } from '../middleware/auth.js'
 import type { IdRow } from '../db/types.js'
 
+/** Consumer bound to another workspace */
+interface BoundConsumerRow extends RowDataPacket {
+  workspace_id: string
+  workspace_name: string
+}
+
 /** Slack auth.test API response */
 interface SlackAuthTestResponse {
   ok: boolean
   error?: string
   user?: string
   team?: string
-}
-
-/** Consumer bound to another workspace */
-interface BoundConsumerRow extends RowDataPacket {
-  workspace_id: string
-  workspace_name: string
 }
 
 /** JSON-RPC response envelope */
@@ -43,16 +43,17 @@ interface JsonRpcToolsResponse extends JsonRpcResponse {
   result?: { tools?: McpToolEntry[] } & Record<string, unknown>
 }
 
-const slackChannelSchema = z.object({
+const consumerChannelSchema = z.object({
+  type: z.string().min(1, 'Consumer type is required'),
   workspace_id: z.string().min(1, 'workspace_id is required').max(255),
   channel_id: z.string().min(1, 'channel_id is required').max(100),
   channel_name: z.string().max(255).optional(),
 })
 
-const slackConnectSchema = z.object({
+const consumerConnectSchema = z.object({
+  type: z.string().min(1, 'Consumer type is required'),
   workspace_id: z.string().min(1, 'workspace_id is required').max(255),
-  bot_token: z.string().min(1, 'bot_token is required').max(500),
-  app_token: z.string().min(1, 'app_token is required').max(500),
+  credentials: z.record(z.string().max(500)),
   channel_id: z.string().max(100).optional(),
 })
 
@@ -77,12 +78,60 @@ const connectors = new Hono<AuthEnv>()
 
 connectors.use('/api/connectors/*', requireAuth)
 
-// Bind a Slack channel to a workspace (uses the org-wide bot)
-connectors.post('/api/connectors/slack-channel', async (c) => {
+// ── Consumer type registry ──
+// Each consumer type registers a credential validator and a connect handler.
+// New consumer types (WhatsApp, Discord, webhook) plug in here without new routes.
+
+interface ConsumerTypeHandler {
+  /** Validate credentials and return a config object to store */
+  buildConfig(credentials: Record<string, string>, channelId?: string, channelName?: string): string
+  /** Verify credentials are valid (e.g. call external API). Throws on failure. */
+  verifyCredentials(credentials: Record<string, string>): Promise<void>
+  /** Start the consumer after connecting. Optional — some types don't need a running process. */
+  start?(credentials: Record<string, string>): Promise<void>
+}
+
+async function verifySlackCredentials(credentials: Record<string, string>): Promise<void> {
+  const botToken = credentials.bot_token
+  if (!botToken) throw new Error('bot_token is required')
+  const res = await fetch('https://slack.com/api/auth.test', {
+    headers: { Authorization: `Bearer ${botToken}` },
+  })
+  const data: SlackAuthTestResponse = await res.json()
+  if (!data.ok) throw new Error(`Invalid bot token: ${data.error}`)
+  log.info({ bot_user: data.user, team: data.team }, 'Consumer credentials verified')
+}
+
+const consumerTypes: Record<string, ConsumerTypeHandler> = {
+  slack: {
+    buildConfig(credentials, channelId, channelName) {
+      return JSON.stringify({
+        bot_token: credentials.bot_token,
+        app_token: credentials.app_token,
+        channels: channelId ? [channelId] : [],
+        channel_name: channelName || (channelId ? `#channel-${channelId}` : null),
+        allow_dms: true,
+        thread_context: true,
+      })
+    },
+    verifyCredentials: verifySlackCredentials,
+    async start(credentials) {
+      const { startSlackConsumer } = await import('../consumers/slack.js')
+      await startSlackConsumer(credentials.bot_token, credentials.app_token)
+    },
+  },
+}
+
+// Bind a channel to a workspace consumer
+connectors.post('/api/connectors/consumer/channel', async (c) => {
   const db = getPool()
-  const result = await parseBody(c, slackChannelSchema)
+  const result = await parseBody(c, consumerChannelSchema)
   if (!result.success) return result.response
-  const { workspace_id, channel_id, channel_name } = result.data
+  const { type, workspace_id, channel_id, channel_name } = result.data
+
+  if (!consumerTypes[type]) {
+    return c.json({ error: `Unsupported consumer type: ${type}` }, 400)
+  }
 
   const [wsRows] = await db.execute<IdRow[]>('SELECT id FROM workspaces WHERE id = ?', [workspace_id])
   if (!wsRows[0]) return c.json({ error: 'Workspace not found' }, 404)
@@ -90,8 +139,8 @@ connectors.post('/api/connectors/slack-channel', async (c) => {
   const [bound] = await db.execute<BoundConsumerRow[]>(
     `SELECT c.workspace_id, w.name as workspace_name FROM consumers c
      JOIN workspaces w ON c.workspace_id = w.id
-     WHERE c.type = 'slack' AND c.workspace_id != ? AND JSON_CONTAINS(c.config, JSON_QUOTE(?), '$.channels')`,
-    [workspace_id, channel_id]
+     WHERE c.type = ? AND c.workspace_id != ? AND JSON_CONTAINS(c.config, JSON_QUOTE(?), '$.channels')`,
+    [type, workspace_id, channel_id]
   )
   if (bound[0]) {
     return c.json({ error: `This channel is already bound to "${bound[0].workspace_name}". A channel can only belong to one workspace.` }, 400)
@@ -105,73 +154,67 @@ connectors.post('/api/connectors/slack-channel', async (c) => {
   })
 
   const [existing] = await db.execute<IdRow[]>(
-    'SELECT id FROM consumers WHERE workspace_id = ? AND type = "slack"', [workspace_id]
+    'SELECT id FROM consumers WHERE workspace_id = ? AND type = ?', [workspace_id, type]
   )
 
   if (existing[0]) {
     await db.execute('UPDATE consumers SET config = ?, status = "active" WHERE id = ?', [config, existing[0].id])
   } else {
     await db.execute(
-      'INSERT INTO consumers (id, workspace_id, type, config, status) VALUES (?, ?, "slack", ?, "active")',
-      [randomBytes(16).toString('hex'), workspace_id, config]
+      'INSERT INTO consumers (id, workspace_id, type, config, status) VALUES (?, ?, ?, ?, "active")',
+      [randomBytes(16).toString('hex'), workspace_id, type, config]
     )
   }
 
   return c.json({ status: 'saved', message: `Channel ${channel_name || channel_id} bound to this workspace.` })
 })
 
-// Connect the org-wide bot (admin only, stores tokens globally)
-connectors.post('/api/connectors/slack', async (c) => {
+// Connect a consumer to a workspace (validates credentials, stores config, starts consumer)
+connectors.post('/api/connectors/consumer', async (c) => {
   const db = getPool()
-  const result = await parseBody(c, slackConnectSchema)
+  const result = await parseBody(c, consumerConnectSchema)
   if (!result.success) return result.response
-  const { workspace_id, bot_token, app_token, channel_id } = result.data
+  const { type, workspace_id, credentials, channel_id } = result.data
+
+  const handler = consumerTypes[type]
+  if (!handler) {
+    return c.json({ error: `Unsupported consumer type: ${type}` }, 400)
+  }
 
   const [wsRows] = await db.execute<IdRow[]>('SELECT id FROM workspaces WHERE id = ?', [workspace_id])
   if (!wsRows[0]) return c.json({ error: 'Workspace not found' }, 404)
 
   try {
-    const res = await fetch('https://slack.com/api/auth.test', {
-      headers: { Authorization: `Bearer ${bot_token}` },
-    })
-    const data: SlackAuthTestResponse = await res.json()
-    if (!data.ok) {
-      return c.json({ error: `Invalid bot token: ${data.error}` }, 400)
-    }
-    log.info({ bot_user: data.user, team: data.team }, 'Slack bot token verified')
-  } catch {
-    return c.json({ error: 'Could not verify bot token' }, 400)
+    await handler.verifyCredentials(credentials)
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 400)
   }
 
-  const config = JSON.stringify({
-    bot_token,
-    app_token,
-    channels: channel_id ? [channel_id] : [],
-    channel_name: channel_id ? `#channel-${channel_id}` : null,
-    allow_dms: true,
-    thread_context: true,
-  })
+  const config = handler.buildConfig(credentials, channel_id)
 
   const [existing] = await db.execute<IdRow[]>(
-    'SELECT id FROM consumers WHERE workspace_id = ? AND type = "slack"', [workspace_id]
+    'SELECT id FROM consumers WHERE workspace_id = ? AND type = ?', [workspace_id, type]
   )
 
   if (existing[0]) {
     await db.execute('UPDATE consumers SET config = ?, status = "active" WHERE id = ?', [config, existing[0].id])
   } else {
     await db.execute(
-      'INSERT INTO consumers (id, workspace_id, type, config, status) VALUES (?, ?, "slack", ?, "active")',
-      [randomBytes(16).toString('hex'), workspace_id, config]
+      'INSERT INTO consumers (id, workspace_id, type, config, status) VALUES (?, ?, ?, ?, "active")',
+      [randomBytes(16).toString('hex'), workspace_id, type, config]
     )
   }
 
-  try {
-    const { startSlackConsumer } = await import('../consumers/slack.js')
-    await startSlackConsumer(bot_token, app_token)
-    return c.json({ status: 'connected', message: 'Connected. The bot is now active in your channel.' })
-  } catch (err) {
-    return c.json({ status: 'saved', message: `Tokens saved but the bot could not start: ${(err as Error).message}. Check the tokens and try again.` })
+  if (handler.start) {
+    try {
+      await handler.start(credentials)
+      return c.json({ status: 'connected', message: 'Connected. The consumer is now active.' })
+    } catch (err) {
+      return c.json({ status: 'saved', message: `Credentials saved but the consumer could not start: ${(err as Error).message}. Check the credentials and try again.` })
+    }
   }
+
+  return c.json({ status: 'saved', message: 'Consumer configured.' })
 })
 
 // Test MCP connection
