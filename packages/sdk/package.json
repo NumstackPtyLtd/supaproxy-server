@@ -11,6 +11,15 @@
       "import": "./dist/index.js"
     }
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NumstackPtyLtd/supaproxy-server.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/NumstackPtyLtd/supaproxy-server#readme",
+  "bugs": {
+    "url": "https://github.com/NumstackPtyLtd/supaproxy-server/issues"
+  },
   "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsc",

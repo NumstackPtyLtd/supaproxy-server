@@ -10,4 +10,5 @@ var/
 .claude/settings.local.json
 _git/
 OSS_ROADMAP.md
+DEV.md
 apps/web/
