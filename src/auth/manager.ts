@@ -9,8 +9,8 @@
  * For the MVP, Slack user ID is the primary identity. Azure AD integration
  * kicks in for the web dashboard and API consumers.
  */
-import type { Permission, SupaproxyUser, HasPermissionProps } from '@supaproxy/shared'
-import { hasPermission } from '@supaproxy/shared'
+import type { Permission, SupaproxyUser, HasPermissionProps } from '../shared/index.js'
+import { hasPermission } from '../shared/index.js'
 import pino from 'pino'
 
 const log = pino({ name: 'auth-manager' })

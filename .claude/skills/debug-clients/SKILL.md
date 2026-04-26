@@ -95,7 +95,7 @@ The server reads consumer tokens from `org_settings` at startup (`index.ts`). If
 ```bash
 # Restart and verify consumer started
 pkill -f "tsx.*index.ts" 2>/dev/null; sleep 2
-cd apps/server && nohup ../../apps/server/node_modules/.bin/tsx src/index.ts > /tmp/supaproxy-server.log 2>&1 &
+REPO_ROOT=$(git rev-parse --show-toplevel) && cd "$REPO_ROOT" && nohup npx tsx src/index.ts > /tmp/supaproxy-server.log 2>&1 &
 sleep 5
 
 # Check which consumers started

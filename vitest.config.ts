@@ -14,9 +14,4 @@ export default defineConfig({
       },
     },
   },
-  resolve: {
-    alias: {
-      '@supaproxy/shared': '../../packages/shared/src',
-    },
-  },
 })
