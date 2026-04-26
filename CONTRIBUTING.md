@@ -17,15 +17,14 @@ git clone https://github.com/NumstackPtyLtd/supaproxy-server.git
 cd supaproxy-server
 pnpm install
 
-# Start MySQL + Redis
-docker compose up -d mysql redis
-
-# Configure environment
+# Configure environment (must be done before Docker — MySQL reads DB_PASSWORD from .env)
 cp .env.example .env
 # Edit .env:
-#   JWT_SECRET — generate with: openssl rand -hex 32
-#   DB_PASSWORD — must match what MySQL started with. Check with:
-#     docker inspect supaproxy-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | grep MYSQL_ROOT
+#   JWT_SECRET: openssl rand -hex 32
+#   DB_PASSWORD: openssl rand -hex 16
+
+# Start MySQL + Redis
+docker compose up -d mysql redis
 
 # Start the server
 pnpm dev   # API on :3001

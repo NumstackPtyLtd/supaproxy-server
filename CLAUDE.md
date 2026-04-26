@@ -49,10 +49,10 @@ src/
 ## Start Dev
 
 ```bash
-docker compose up -d mysql redis   # MySQL + Redis
 pnpm install                       # Dependencies
 cp .env.example .env               # Configure env vars
 # Edit .env: set JWT_SECRET and DB_PASSWORD (see .env.example for details)
+docker compose up -d mysql redis   # MySQL + Redis (reads DB_PASSWORD from .env)
 pnpm dev                           # API on :3001
 ```
 
