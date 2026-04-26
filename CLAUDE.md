@@ -44,6 +44,7 @@ src/
 | Repo | Visibility | Purpose |
 |---|---|---|
 | supaproxy-server (this) | Public (MIT) | Engine: API server |
+| supaproxy-sdk | Public (MIT) | TypeScript SDK (`@supaproxy/sdk` on npm) |
 | supaproxy-dashboard | Private | Astro + React frontend |
 
 ## Start Dev

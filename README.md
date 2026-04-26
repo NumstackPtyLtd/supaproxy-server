@@ -74,6 +74,23 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup with Node.js and p
 - **Database** — MySQL 8. Conversations, messages, audit logs, stats, knowledge sources, guardrails
 - **Queue** — Redis + BullMQ. Cold messages, conversation stats generation
 
+## SDK
+
+Install the TypeScript client for building your own UI or integrations:
+
+```bash
+pnpm add @supaproxy/sdk
+```
+
+```typescript
+import { SupaProxyClient } from '@supaproxy/sdk';
+
+const client = new SupaProxyClient('http://localhost:3001');
+const { workspaces } = await client.workspaces.list();
+```
+
+See [@supaproxy/sdk on npm](https://www.npmjs.com/package/@supaproxy/sdk) for full docs.
+
 ## Configuration
 
 See `.env.example` for all environment variables.
