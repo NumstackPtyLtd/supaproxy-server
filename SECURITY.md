@@ -4,7 +4,7 @@
 
 **Do not open a public issue for security vulnerabilities.**
 
-Please email **security@numstack.com** with:
+Please email **numstackdev@gmail.com** with:
 
 - Description of the vulnerability
 - Steps to reproduce
