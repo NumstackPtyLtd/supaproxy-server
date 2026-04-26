@@ -1,23 +1,13 @@
 import { Hono } from 'hono'
-import { getCookie } from 'hono/cookie'
 import type { RowDataPacket } from 'mysql2'
-import jwt from 'jsonwebtoken'
 import { z } from 'zod'
 import pino from 'pino'
 import { getPool } from '../db/pool.js'
 import { runAgent } from '../core/agent.js'
-import { JWT_SECRET } from '../config.js'
 import { parseBody } from '../middleware/validate.js'
+import { requireAuth, type AuthUser, type AuthEnv } from '../middleware/auth.js'
 import type { WorkspaceRow } from '../db/types.js'
 
-/** JWT payload for authenticated users */
-interface SessionPayload {
-  id: string
-  name: string
-  email: string
-  org_id: string
-  org_role: string
-}
 
 /** Connection row subset needed for agent dispatch */
 interface ConnectionConfigRow extends RowDataPacket {
@@ -37,7 +27,9 @@ const queryBodySchema = z.object({
 
 const log = pino({ name: 'routes/query' })
 
-const query = new Hono()
+const query = new Hono<AuthEnv>()
+
+query.use('/api/workspaces/*/query', requireAuth)
 
 query.post('/api/workspaces/:id/query', async (c) => {
   const db = getPool()
@@ -55,16 +47,7 @@ query.post('/api/workspaces/:id/query', async (c) => {
   if (!parsed.success) return parsed.response
   const queryText = parsed.data.query
 
-  // Get user from JWT (optional)
-  let user: SessionPayload | null = null
-  const token = getCookie(c, 'supaproxy_session')
-  if (token) {
-    try {
-      user = jwt.verify(token, JWT_SECRET) as SessionPayload
-    } catch (err) {
-      log.debug({ error: (err as Error).message }, 'JWT verification failed for query session')
-    }
-  }
+  const user = c.get('user') as AuthUser
 
   const { findOrCreateConversation, getConversationHistory } = await import('../core/conversation.js')
   const sessionId = parsed.data.session_id || `api:${user?.id || 'anon'}:${wsId}:${Date.now()}`

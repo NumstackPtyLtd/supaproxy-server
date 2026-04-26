@@ -1,27 +1,17 @@
 import { Hono } from 'hono'
-import { getCookie } from 'hono/cookie'
-import jwt from 'jsonwebtoken'
 import { randomBytes } from 'crypto'
 import { z } from 'zod'
 import pino from 'pino'
 import type { RowDataPacket } from 'mysql2'
 import { getPool } from '../db/pool.js'
-import { JWT_SECRET, DEFAULT_MODEL } from '../config.js'
+import { DEFAULT_MODEL } from '../config.js'
 import { parseBody } from '../middleware/validate.js'
+import { requireAuth, type AuthUser, type AuthEnv } from '../middleware/auth.js'
 import type {
   IdRow,
   TotalRow,
 } from '../db/types.js'
 
-// ── JWT payload ──
-
-interface JwtPayload {
-  org_id: string
-  user_id: string
-  email: string
-  iat?: number
-  exp?: number
-}
 
 // ── Inline row types for JOIN / aggregate queries ──
 
@@ -266,7 +256,12 @@ const updateWorkspaceSchema = z.object({
 
 const log = pino({ name: 'routes/workspaces' })
 
-const workspaces = new Hono()
+const workspaces = new Hono<AuthEnv>()
+
+workspaces.use('/api/workspaces/*', requireAuth)
+workspaces.use('/api/workspaces', requireAuth)
+workspaces.use('/api/teams', requireAuth)
+workspaces.use('/api/connections/*', requireAuth)
 
 // List teams
 workspaces.get('/api/teams', async (c) => {
@@ -282,23 +277,9 @@ workspaces.post('/api/workspaces', async (c) => {
   if (!result.success) return result.response
   const { name, team_id, team_name, system_prompt, org_id } = result.data
 
-  // Resolve org_id
-  let resolvedOrgId = org_id
-  if (!resolvedOrgId) {
-    const token = getCookie(c, 'supaproxy_session')
-    if (token) {
-      try {
-        const payload = jwt.verify(token, JWT_SECRET) as JwtPayload
-        resolvedOrgId = payload.org_id
-      } catch (err) {
-        log.debug({ error: (err as Error).message }, 'JWT verification failed when resolving org_id')
-      }
-    }
-  }
-  if (!resolvedOrgId) {
-    const [orgs] = await db.execute<IdRow[]>('SELECT id FROM organisations LIMIT 1')
-    resolvedOrgId = orgs[0]?.id
-  }
+  // Resolve org_id from request body or authenticated user
+  const user = c.get('user') as AuthUser
+  const resolvedOrgId = org_id || user.org_id
 
   // Resolve or create team
   let resolvedTeamId = team_id
