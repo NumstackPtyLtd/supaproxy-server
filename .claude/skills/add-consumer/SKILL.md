@@ -9,11 +9,11 @@ description: >
 
 # Add Consumer
 
-A consumer connects an external message source to the SupaProxy agent loop. The existing Slack consumer (`apps/server/src/consumers/slack.ts`) is the reference implementation.
+A consumer connects an external message source to the SupaProxy agent loop. The existing Slack consumer (`src/consumers/slack.ts`) is the reference implementation.
 
 ## Step 1: Create the consumer file
 
-Create `apps/server/src/consumers/<name>.ts`.
+Create `src/consumers/<name>.ts`.
 
 Follow this structure:
 

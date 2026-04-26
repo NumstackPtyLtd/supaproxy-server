@@ -23,10 +23,10 @@ Server code and API responses must be provider-agnostic.
 
 ```bash
 # Provider names in server code (outside of SDK/client instantiation)
-grep -rn "claude\|anthropic\|sonnet\|haiku\|opus\|openai\|gpt-" apps/server/src/ --include="*.ts" -i | grep -v node_modules | grep -v SKILL.md | grep -v CLAUDE.md | grep -v "import.*from\|require("
+grep -rn "claude\|anthropic\|sonnet\|haiku\|opus\|openai\|gpt-" src/ --include="*.ts" -i | grep -v node_modules | grep -v SKILL.md | grep -v CLAUDE.md | grep -v "import.*from\|require("
 
 # Provider-specific token format placeholders
-grep -rn "xoxb-\|xapp-\|sk-ant-\|sk-proj-" apps/server/src/ packages/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md
+grep -rn "xoxb-\|xapp-\|sk-ant-\|sk-proj-" src/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md
 ```
 
 Model IDs come from the DB, never hardcoded. Token placeholders should be generic (e.g. "paste your token").
@@ -35,10 +35,10 @@ Model IDs come from the DB, never hardcoded. Token placeholders should be generi
 
 ```bash
 # any types (target: zero)
-echo "=== any types ===" && grep -rn ": any\|as any\|<any>\|= any" apps/server/src/ packages/ --include="*.ts" | grep -v node_modules | grep -v ".d.ts" | wc -l
+echo "=== any types ===" && grep -rn ": any\|as any\|<any>\|= any" src/ --include="*.ts" | grep -v node_modules | grep -v ".d.ts" | wc -l
 
 # Worst offenders
-grep -rn ": any\|as any\|<any>" apps/server/src/ packages/ --include="*.ts" | grep -v node_modules | grep -v ".d.ts" | awk -F: '{print $1}' | sort | uniq -c | sort -rn | head -10
+grep -rn ": any\|as any\|<any>" src/ --include="*.ts" | grep -v node_modules | grep -v ".d.ts" | awk -F: '{print $1}' | sort | uniq -c | sort -rn | head -10
 ```
 
 Target: zero `any` types. Every DB result must use a typed row interface extending `RowDataPacket`.
@@ -47,19 +47,19 @@ Target: zero `any` types. Every DB result must use a typed row interface extendi
 
 ```bash
 # Find interfaces/types defined in multiple files
-grep -rn "^interface \|^export interface \|^type \|^export type " apps/server/src/ packages/ --include="*.ts" | grep -v node_modules | awk -F: '{print $2}' | sed 's/export //' | sort | uniq -d
+grep -rn "^interface \|^export interface \|^type \|^export type " src/ --include="*.ts" | grep -v node_modules | awk -F: '{print $2}' | sed 's/export //' | sort | uniq -d
 ```
 
-Types shared across routes should be defined ONCE in `db/types.ts` or `@supaproxy/shared` and imported.
+Types shared across routes should be defined ONCE in `db/types.ts` or `src/shared/` and imported.
 
 ## Step 5: Dead Code & Unused Exports
 
 ```bash
 # Deprecated functions
-grep -rn "@deprecated" apps/server/src/ packages/ --include="*.ts" | grep -v node_modules
+grep -rn "@deprecated" src/ --include="*.ts" | grep -v node_modules
 
 # Unused imports (basic check)
-grep -rn "^import " apps/server/src/ --include="*.ts" | grep -v node_modules | head -20
+grep -rn "^import " src/ --include="*.ts" | grep -v node_modules | head -20
 ```
 
 For each deprecated export, check if anything still imports it. Remove if unused.
@@ -68,13 +68,13 @@ For each deprecated export, check if anything still imports it. Remove if unused
 
 ```bash
 # Empty catch blocks
-grep -rn "catch {}\|catch () {}\|\.catch(() => {})\|catch {\s*}" apps/server/src/ --include="*.ts" | grep -v node_modules
+grep -rn "catch {}\|catch () {}\|\.catch(() => {})\|catch {\s*}" src/ --include="*.ts" | grep -v node_modules
 
 # Catch blocks that swallow error details
-grep -rn "catch" apps/server/src/ --include="*.ts" -A 2 | grep -v "log\.\|throw\|pino\|console" | grep -v node_modules
+grep -rn "catch" src/ --include="*.ts" -A 2 | grep -v "log\.\|throw\|pino\|console" | grep -v node_modules
 
 # Missing res.ok checks on outbound fetch
-grep -rn "\.json()" apps/server/src/ --include="*.ts" | grep -v node_modules | grep -v "c\.json\|return.*json\|parseBody\|req\.json"
+grep -rn "\.json()" src/ --include="*.ts" | grep -v node_modules | grep -v "c\.json\|return.*json\|parseBody\|req\.json"
 ```
 
 Rules:
@@ -86,10 +86,10 @@ Rules:
 
 ```bash
 # Hardcoded timeouts/intervals
-grep -rn "setTimeout\|setInterval\|\.timeout\|delay:" apps/server/src/ --include="*.ts" | grep -v node_modules | grep "[0-9]\{3,\}"
+grep -rn "setTimeout\|setInterval\|\.timeout\|delay:" src/ --include="*.ts" | grep -v node_modules | grep "[0-9]\{3,\}"
 
 # Hardcoded limits
-grep -rn "slice(0,\|\.slice(-\|limit:" apps/server/src/ --include="*.ts" | grep -v node_modules | grep "[0-9]"
+grep -rn "slice(0,\|\.slice(-\|limit:" src/ --include="*.ts" | grep -v node_modules | grep "[0-9]"
 ```
 
 Every timeout, interval, limit, and threshold must be a named constant:
@@ -103,20 +103,20 @@ const MAX_TOOL_ROUNDS = 10;
 ```bash
 # Business logic in route handlers (should be in core/)
 # Look for complex DB queries or multi-step operations directly in routes
-wc -l apps/server/src/routes/*.ts | sort -rn | head -10
+wc -l src/routes/*.ts | sort -rn | head -10
 
 # Route handlers should be thin: validate input, call service, return JSON
 # Files over 200 lines likely have business logic that should move to core/
 
 # Direct pool.execute in routes (acceptable for simple queries, but complex logic should be in services)
-grep -rn "pool\.execute\|db\.execute" apps/server/src/routes/ --include="*.ts" | grep -v node_modules | wc -l
+grep -rn "pool\.execute\|db\.execute" src/routes/ --include="*.ts" | grep -v node_modules | wc -l
 ```
 
 ## Step 9: SQL Safety
 
 ```bash
 # String interpolation in SQL queries (must use parameterized ?)
-grep -rn "execute(\`\|execute('" apps/server/src/ --include="*.ts" | grep -v node_modules | grep '\${'
+grep -rn "execute(\`\|execute('" src/ --include="*.ts" | grep -v node_modules | grep '\${'
 ```
 
 All SQL must use parameterized queries. Never interpolate variables into SQL strings.
@@ -125,26 +125,23 @@ All SQL must use parameterized queries. Never interpolate variables into SQL str
 
 ```bash
 # Consumer files should follow the pattern in consumers/slack.ts
-ls -la apps/server/src/consumers/
+ls -la src/consumers/
 
 # Each consumer must:
 # 1. Import and call runAgent from core/agent.ts
 # 2. Look up workspace by channel/endpoint
 # 3. Handle errors and log with pino
-grep -rn "runAgent" apps/server/src/consumers/ --include="*.ts" | grep -v node_modules
+grep -rn "runAgent" src/consumers/ --include="*.ts" | grep -v node_modules
 ```
 
 ## Step 11: Package Boundaries
 
 ```bash
-# Server code importing from packages correctly
-grep -rn "from '@supaproxy/" apps/server/src/ --include="*.ts" | grep -v node_modules
-
-# Packages should not import from apps/server
-grep -rn "from '.*apps/server\|from '.*\.\.\/\.\.\/apps" packages/ --include="*.ts" | grep -v node_modules
+# Shared types should only be imported from src/shared/
+grep -rn "from '.*shared" src/ --include="*.ts" | grep -v node_modules | grep -v "from '\.\./shared\|from '\./shared"
 ```
 
-`@supaproxy/shared` and `@supaproxy/sdk` must not import from the server app. Dependencies flow: server -> packages, never the reverse.
+Shared types in `src/shared/` should be imported via relative paths (`../shared/index.js`).
 
 ## Report Format
 

@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
-import type { AuditEntry } from '@supaproxy/shared'
+import type { AuditEntry } from '../shared/index.js'
 import pino from 'pino'
 import { LOG_DIR } from '../config.js'
 

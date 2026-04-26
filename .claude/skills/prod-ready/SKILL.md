@@ -14,7 +14,7 @@ Scan for server code that works in dev but breaks, leaks, or is exploitable in p
 ## Step 1: Cookie Security
 
 ```bash
-grep -rn "secure:" apps/server/src/ --include="*.ts" | grep -v node_modules
+grep -rn "secure:" src/ --include="*.ts" | grep -v node_modules
 ```
 
 Every cookie must use `secure: IS_PRODUCTION` (imported from config), never `secure: false`.
@@ -22,7 +22,7 @@ Every cookie must use `secure: IS_PRODUCTION` (imported from config), never `sec
 ## Step 2: Error Messages That Leak Internals
 
 ```bash
-grep -rn "stack\|__dirname\|process\.cwd" apps/server/src/routes/ --include="*.ts" | grep -v node_modules
+grep -rn "stack\|__dirname\|process\.cwd" src/routes/ --include="*.ts" | grep -v node_modules
 ```
 
 Error responses to clients must be generic. Full errors are logged server-side with pino. Never send stack traces, file paths, or SQL error messages in JSON responses.
@@ -33,7 +33,7 @@ Check that the global `app.onError` handler in `index.ts` returns a generic mess
 
 ```bash
 # Find .json() calls in server code that might not check res.ok first
-grep -rn "\.json()" apps/server/src/ --include="*.ts" | grep -v node_modules | grep -v "c\.json\|return.*json\|parseBody\|req\.json"
+grep -rn "\.json()" src/ --include="*.ts" | grep -v node_modules | grep -v "c\.json\|return.*json\|parseBody\|req\.json"
 ```
 
 Every outbound `fetch().then(r => r.json())` in server code must check `res.ok` before parsing:
@@ -47,8 +47,8 @@ const data = await res.json();
 
 ```bash
 # Routes that don't use requireAuth (check each is intentionally public)
-grep -rn "router\.\(get\|post\|put\|delete\|patch\)(" apps/server/src/routes/ --include="*.ts" | grep -v node_modules
-grep -rn "requireAuth" apps/server/src/routes/ --include="*.ts" | grep -v node_modules
+grep -rn "router\.\(get\|post\|put\|delete\|patch\)(" src/routes/ --include="*.ts" | grep -v node_modules
+grep -rn "requireAuth" src/routes/ --include="*.ts" | grep -v node_modules
 ```
 
 Every endpoint except `/health`, `/api/auth/*`, `/api/signup`, and `/api/models` must be behind `requireAuth`.
@@ -56,7 +56,7 @@ Every endpoint except `/health`, `/api/auth/*`, `/api/signup`, and `/api/models`
 ## Step 5: No Hardcoded Localhost in Runtime Output
 
 ```bash
-grep -rn "localhost" apps/server/src/ packages/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md | grep -v ".env" | grep -v "\.example" | grep -v "// " | grep -v CLAUDE.md
+grep -rn "localhost" src/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md | grep -v ".env" | grep -v "\.example" | grep -v "// " | grep -v CLAUDE.md
 ```
 
 Logs, error messages, and responses must not contain hardcoded localhost URLs. Use env-derived values.
@@ -64,7 +64,7 @@ Logs, error messages, and responses must not contain hardcoded localhost URLs. U
 ## Step 6: Empty Catch Blocks
 
 ```bash
-grep -rn "catch {}\|catch () {}\|\.catch(() => {})\|catch {\s*}" apps/server/src/ --include="*.ts" | grep -v node_modules
+grep -rn "catch {}\|catch () {}\|\.catch(() => {})\|catch {\s*}" src/ --include="*.ts" | grep -v node_modules
 ```
 
 Every catch block must log the error with pino or propagate it. No silent swallowing.
@@ -73,10 +73,10 @@ Every catch block must log the error with pino or propagate it. No silent swallo
 
 ```bash
 # console.log (should use pino logger or be removed)
-grep -rn "console\.log" apps/server/src/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md
+grep -rn "console\.log" src/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md
 
 # TODO/FIXME/HACK
-grep -rn "TODO\|FIXME\|HACK\|XXX" apps/server/src/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md
+grep -rn "TODO\|FIXME\|HACK\|XXX" src/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md
 ```
 
 Server code must use the pino logger (`log.info`, `log.warn`, `log.error`), not `console.log`.
@@ -84,7 +84,7 @@ Server code must use the pino logger (`log.info`, `log.warn`, `log.error`), not 
 ## Step 8: Hardcoded Timeouts and Limits
 
 ```bash
-grep -rn "setTimeout\|setInterval\|\.timeout\|delay:" apps/server/src/ --include="*.ts" | grep -v node_modules | grep "[0-9]\{3,\}"
+grep -rn "setTimeout\|setInterval\|\.timeout\|delay:" src/ --include="*.ts" | grep -v node_modules | grep "[0-9]\{3,\}"
 ```
 
 Every timeout, interval, limit, and threshold must be a named constant:
@@ -97,7 +97,7 @@ const MAX_TOOL_ROUNDS = 10;
 
 ```bash
 # String concatenation in SQL (should use parameterized queries)
-grep -rn "execute(\`\|execute('" apps/server/src/ --include="*.ts" | grep -v node_modules | grep '\${'
+grep -rn "execute(\`\|execute('" src/ --include="*.ts" | grep -v node_modules | grep '\${'
 ```
 
 All SQL must use parameterized queries with `?` placeholders. Never interpolate variables into SQL strings.

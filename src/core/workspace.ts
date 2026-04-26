@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { parse } from 'yaml'
-import type { WorkspaceConfig } from '@supaproxy/shared'
+import type { WorkspaceConfig } from '../shared/index.js'
 import pino from 'pino'
 
 const log = pino({ name: 'workspace-registry' })
