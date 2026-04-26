@@ -32,7 +32,7 @@ const API_URL = requireEnv('API_URL')
 const JWT_SECRET = requireEnv('JWT_SECRET')
 ```
 
-Where `requireEnv` is defined in `apps/server/src/config.ts`:
+Where `requireEnv` is defined in `src/config.ts`:
 ```typescript
 const requireEnv = (name: string): string => {
   const val = process.env[name]
@@ -50,15 +50,15 @@ Search for violations:
 
 ```bash
 # Fallback patterns in server code
-grep -rn "process\.env\.\w* ||" apps/server/src/ --include="*.ts" | grep -v node_modules | grep -v '.env'
-grep -rn "process\.env\.\w* \?\?" apps/server/src/ --include="*.ts" | grep -v node_modules | grep -v '.env'
+grep -rn "process\.env\.\w* ||" src/ --include="*.ts" | grep -v node_modules | grep -v '.env'
+grep -rn "process\.env\.\w* \?\?" src/ --include="*.ts" | grep -v node_modules | grep -v '.env'
 
 # Fallback patterns in packages
-grep -rn "process\.env\.\w* ||" packages/ --include="*.ts" | grep -v node_modules
-grep -rn "process\.env\.\w* \?\?" packages/ --include="*.ts" | grep -v node_modules
+grep -rn "process\.env\.\w* ||" --include="*.ts" | grep -v node_modules
+grep -rn "process\.env\.\w* \?\?" --include="*.ts" | grep -v node_modules
 
 # Hardcoded localhost anywhere
-grep -rn "http://localhost" apps/ packages/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md | grep -v ".env"
+grep -rn "http://localhost" apps/ --include="*.ts" | grep -v node_modules | grep -v SKILL.md | grep -v ".env"
 ```
 
 ## Exceptions
@@ -71,7 +71,7 @@ grep -rn "http://localhost" apps/ packages/ --include="*.ts" | grep -v node_modu
 ## When you find a violation
 
 1. Remove the fallback
-2. Use `requireEnv()` from `apps/server/src/config.ts`
+2. Use `requireEnv()` from `src/config.ts`
 3. Add the variable to `.env.example` with a placeholder value
 4. Verify the `.env` file has the real value set
 

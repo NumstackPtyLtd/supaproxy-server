@@ -9,7 +9,7 @@ description: >
 
 ## Step 1: Determine which route module it belongs to
 
-Routes are split into modules in `apps/server/src/routes/`:
+Routes are split into modules in `src/routes/`:
 
 | Module | Prefix | Purpose |
 |---|---|---|

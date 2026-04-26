@@ -21,24 +21,30 @@ pnpm install
 docker compose up -d mysql redis
 
 # Configure environment
-cp apps/server/.env.example apps/server/.env
-# Edit apps/server/.env:
+cp .env.example .env
+# Edit .env:
 #   JWT_SECRET — generate with: openssl rand -hex 32
 #   DB_PASSWORD — must match what MySQL started with. Check with:
 #     docker inspect supaproxy-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | grep MYSQL_ROOT
 
 # Start the server
-pnpm --filter @supaproxy/server dev   # API on :3001
+pnpm dev   # API on :3001
 ```
-
-> **Two .env files**: The root `.env` is for docker-compose (service names, internal ports). `apps/server/.env` is for local dev (127.0.0.1, mapped ports 3308/6380). See `.env.example` for the local dev template.
 
 ### Project structure
 
 ```
-apps/server/     # Hono backend (API, agent, consumers)
-packages/sdk/    # TypeScript API client
-packages/shared/ # Shared types and entities
+src/
+├── index.ts           # Hono app entry point
+├── config.ts          # Environment config (requireEnv)
+├── shared/            # Types, entities, API contracts
+├── routes/            # Hono route modules
+├── core/              # Business logic (agent, lifecycle, workspace)
+├── db/                # MySQL pool, migrations, types
+├── auth/              # Auth services
+├── middleware/         # Auth + validation middleware
+├── consumers/         # External message consumers (Slack)
+└── observability/     # Audit logging
 ```
 
 ## Code style
@@ -53,10 +59,9 @@ All code rules are documented in `CLAUDE.md`. The key ones:
 
 1. Fork the repo and create a branch from `main`
 2. Make your changes
-3. Build shared packages: `pnpm --filter @supaproxy/shared build`
-4. Ensure TypeScript compiles: `npx tsc --noEmit -p apps/server/tsconfig.json`
-5. Run tests: `pnpm test`
-6. Open a PR against `main`
+3. Ensure TypeScript compiles: `npx tsc --noEmit`
+4. Run tests: `pnpm test`
+5. Open a PR against `main`
 
 ### PR checklist
 
