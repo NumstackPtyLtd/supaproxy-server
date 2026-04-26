@@ -18,7 +18,6 @@ SupaProxy sits between your teams and your AI models. You bring the LLM (Anthrop
 - **Conversation lifecycle** — open → cold → closed with configurable timeouts and AI-generated follow-ups
 - **Post-conversation analysis** — sentiment, resolution status, knowledge gaps, compliance violations, fraud indicators
 - **Cost tracking** — per-query token counts, cost per conversation, monthly spend per workspace
-- **SDK** — typed TypeScript client for building your own UI or integrations
 
 ## Quick start
 
@@ -48,25 +47,13 @@ pnpm install
 docker compose up -d mysql redis
 
 # Configure environment
-cp apps/server/.env.example apps/server/.env
+cp .env.example .env
 # Edit .env: set JWT_SECRET (openssl rand -hex 32) and DB_PASSWORD
 # DB_PASSWORD must match MYSQL_ROOT_PASSWORD — check with:
 #   docker inspect supaproxy-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | grep MYSQL_ROOT
 
 # Start the server
-pnpm --filter @supaproxy/server dev   # API on :3001
-```
-
-### Using the SDK
-
-```typescript
-import { SupaProxyClient } from '@supaproxy/sdk';
-
-const client = new SupaProxyClient('http://localhost:3001');
-const { workspaces } = await client.workspaces.list();
-const result = await client.workspaces.query('ws-my-workspace', {
-  query: 'What tickets are open?'
-});
+pnpm dev   # API on :3001
 ```
 
 ### Manual setup (without Docker)
@@ -86,11 +73,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full dev setup with Node.js and p
 - **Server** — Node.js (Hono + BullMQ). Agent loop, MCP client, consumers, lifecycle manager, conversation analysis
 - **Database** — MySQL 8. Conversations, messages, audit logs, stats, knowledge sources, guardrails
 - **Queue** — Redis + BullMQ. Cold messages, conversation stats generation
-- **SDK** — TypeScript client (`@supaproxy/sdk`) for building frontends and integrations
 
 ## Configuration
 
-See `apps/server/.env.example` for all environment variables.
+See `.env.example` for all environment variables.
 
 ## Tech stack
 
@@ -101,14 +87,7 @@ See `apps/server/.env.example` for all environment variables.
 | Queue | Redis 7 |
 | AI | Any LLM (Anthropic, OpenAI, etc.) |
 | MCP | Model Context Protocol SDK |
-| Consumers | Slack Bolt, API, SDK |
-
-## Packages
-
-| Package | Description |
-|---------|-------------|
-| `@supaproxy/shared` | Shared types, entities, and API contracts |
-| `@supaproxy/sdk` | TypeScript API client (alpha) |
+| Consumers | Slack Bolt, API |
 
 ## Contributing
 

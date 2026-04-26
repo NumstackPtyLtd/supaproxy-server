@@ -1,73 +1,65 @@
 # SupaProxy
 
-Open-source AI operations engine. Hono API server, SDK, and shared types.
+Open-source AI operations engine. Hono API server.
 
 ## Architecture
 
 ```
-apps/server/ (Hono, port 3001)
-├── src/
-│   ├── config.ts          requireEnv(), no fallbacks
-│   ├── index.ts            Hono app, health check, route mounts
-│   ├── middleware/
-│   │   ├── auth.ts         requireAuth (JWT cookie verification)
-│   │   └── validate.ts     parseBody (Zod schema validation)
-│   ├── routes/             Modular Hono routers
-│   │   ├── auth.ts         Login, logout, session, signup
-│   │   ├── org.ts          Org CRUD, settings, users
-│   │   ├── queues.ts       BullMQ queue management
-│   │   ├── workspaces.ts   Workspace CRUD, dashboard, activity
-│   │   ├── conversations.ts Conversation list, detail, close
-│   │   ├── connectors.ts   MCP + Slack connectors
-│   │   └── query.ts        Agent loop entry point
-│   ├── core/               Business logic
-│   │   ├── agent.ts        AI + MCP tool orchestration
-│   │   ├── lifecycle.ts    Conversation lifecycle loop
-│   │   ├── workspace.ts    Workspace operations
-│   │   └── conversation.ts Conversation operations
-│   ├── consumers/          External message consumers
-│   │   └── slack.ts        Slack Socket Mode consumer
-│   ├── auth/               Auth services
-│   │   ├── db.ts           User queries
-│   │   └── manager.ts      Auth business logic
-│   ├── db/                 Database layer
-│   │   ├── pool.ts         MySQL connection pool
-│   │   ├── migrations.ts   Schema migrations
-│   │   ├── types.ts        Row type definitions
-│   │   └── seed.ts         Seed data
-│   └── observability/
-│       └── audit.ts        Audit logging
-
-packages/
-├── shared/   @supaproxy/shared (types, entities, API contracts)
-└── sdk/      @supaproxy/sdk (TypeScript API client)
+src/
+├── config.ts          requireEnv(), no fallbacks
+├── index.ts           Hono app, health check, route mounts
+├── shared/            Types, entities, API contracts
+├── middleware/
+│   ├── auth.ts        requireAuth (JWT cookie verification)
+│   └── validate.ts    parseBody (Zod schema validation)
+├── routes/            Modular Hono routers
+│   ├── auth.ts        Login, logout, session, signup
+│   ├── org.ts         Org CRUD, settings, users
+│   ├── queues.ts      BullMQ queue management
+│   ├── workspaces.ts  Workspace CRUD, dashboard, activity
+│   ├── conversations.ts Conversation list, detail, close
+│   ├── connectors.ts  MCP + Slack connectors
+│   └── query.ts       Agent loop entry point
+├── core/              Business logic
+│   ├── agent.ts       AI + MCP tool orchestration
+│   ├── lifecycle.ts   Conversation lifecycle loop
+│   ├── workspace.ts   Workspace operations
+│   └── conversation.ts Conversation operations
+├── consumers/         External message consumers
+│   └── slack.ts       Slack Socket Mode consumer
+├── auth/              Auth services
+│   ├── db.ts          User queries
+│   └── manager.ts     Auth business logic
+├── db/                Database layer
+│   ├── pool.ts        MySQL connection pool
+│   ├── migrations.ts  Schema migrations
+│   ├── types.ts       Row type definitions
+│   └── seed.ts        Seed data
+└── observability/
+    └── audit.ts       Audit logging
 ```
 
 ## Related Repos
 
 | Repo | Visibility | Purpose |
 |---|---|---|
-| supaproxy-server (this) | Public (MIT) | Engine: API server, SDK, shared types |
+| supaproxy-server (this) | Public (MIT) | Engine: API server |
 | supaproxy-dashboard | Private | Astro + React frontend |
-| supaproxy | Private | Internal team docs |
 
 ## Start Dev
 
 ```bash
-docker compose up -d mysql redis        # MySQL + Redis
-pnpm install                            # Dependencies
-cp apps/server/.env.example apps/server/.env  # Configure env vars
-# Edit apps/server/.env: set JWT_SECRET and DB_PASSWORD (see .env.example for details)
-pnpm --filter @supaproxy/server dev     # API on :3001
+docker compose up -d mysql redis   # MySQL + Redis
+pnpm install                       # Dependencies
+cp .env.example .env               # Configure env vars
+# Edit .env: set JWT_SECRET and DB_PASSWORD (see .env.example for details)
+pnpm dev                           # API on :3001
 ```
-
-> **Two .env files**: Root `.env` is for docker-compose (service names `mysql`/`redis`, internal ports 3306/6379). `apps/server/.env` is for local dev (127.0.0.1, mapped ports 3308/6380). `DB_PASSWORD` must match between them.
 
 ## Stack
 
 | Layer | Tech |
 |---|---|
-| Monorepo | Turborepo + pnpm |
 | Backend | Hono + TypeScript |
 | Auth | JWT cookies (httpOnly, secure in prod) |
 | Validation | Zod schemas via `parseBody()` |
@@ -79,8 +71,8 @@ pnpm --filter @supaproxy/server dev     # API on :3001
 
 ### Architecture
 - **Use `requireAuth` middleware** for protected routes. Never manually parse JWT cookies in route handlers.
-- **Routes in `apps/server/src/routes/`**, not in index.ts. Each file exports a Hono sub-app.
-- **Config in `apps/server/src/config.ts`** via `requireEnv()`. All env vars throw if missing.
+- **Routes in `src/routes/`**, not in index.ts. Each file exports a Hono sub-app.
+- **Config in `src/config.ts`** via `requireEnv()`. All env vars throw if missing.
 - **Business logic in `core/` services, not route handlers.** Route handlers validate input, call services, return responses.
 - **Validation via `parseBody(c, schema)`** from `middleware/validate.ts`. Use Zod schemas.
 - **Consumers in `consumers/`**. Each consumer handles one external message source and calls into `core/agent.ts`.
@@ -117,7 +109,7 @@ pnpm --filter @supaproxy/server dev     # API on :3001
 ### Testing
 - **New features need tests.** At minimum: unit tests for services, integration tests for API endpoints.
 - **Run `/audit-code` before PRs.** Full codebase scan including security, types, dead code.
-- **Vitest** for all tests. Config at `apps/server/vitest.config.ts`.
+- **Vitest** for all tests. Config at `vitest.config.ts`.
 
 ## Skills
 
@@ -142,11 +134,11 @@ pnpm --filter @supaproxy/server dev     # API on :3001
 1. Branch from `main` with a descriptive name (`feat/`, `fix/`, `refactor/`)
 2. Make changes following the code rules above
 3. Run `/audit-code` to catch violations
-4. Run tests: `cd apps/server && pnpm test`
+4. Run tests: `pnpm test`
 5. Open PR against `main`
 
 ### Adding a New Route
-Run `/add-api-route` or follow the pattern in `apps/server/src/routes/`. Every route file:
+Run `/add-api-route` or follow the pattern in `src/routes/`. Every route file:
 1. Exports a `Hono<AuthEnv>` sub-app
 2. Uses `requireAuth` middleware on protected paths
 3. Validates input with `parseBody(c, zodSchema)`
@@ -154,13 +146,13 @@ Run `/add-api-route` or follow the pattern in `apps/server/src/routes/`. Every r
 5. Gets mounted in `index.ts` via `app.route('/', router)`
 
 ### Adding a New Service
-1. Create the file in `apps/server/src/core/`
+1. Create the file in `src/core/`
 2. Accept typed parameters, return typed results
 3. Use `getPool()` for DB access, pino for logging
 4. Keep route handlers thin -- they call your service and return JSON
 
 ### Adding a New Consumer
-Run `/add-consumer` or follow the pattern in `apps/server/src/consumers/slack.ts`. A consumer:
+Run `/add-consumer` or follow the pattern in `src/consumers/slack.ts`. A consumer:
 1. Connects to an external message source (Slack, webhook, etc.)
 2. Maps incoming channels/endpoints to workspaces via DB lookup
 3. Calls `runAgent()` from `core/agent.ts` with the query

@@ -18,8 +18,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @supaproxy/shared build
-      - run: npx tsc --noEmit -p apps/server/tsconfig.json
+      - run: npx tsc --noEmit
 
   test:
     name: Tests

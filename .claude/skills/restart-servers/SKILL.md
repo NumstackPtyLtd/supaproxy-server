@@ -2,15 +2,14 @@
 name: restart-servers
 description: >
   Restarts the Hono dev server after code changes. Run after ANY file edit
-  in apps/server/ or packages/, after dependency changes, or after token
-  updates. The user should never see "connection refused".
+  in src/, after dependency changes, or after token updates.
+  The user should never see "connection refused".
 ---
 
 # Restart Servers
 
 ## When to run
-- After editing any file in `apps/server/`
-- After editing any file in `packages/`
+- After editing any file in `src/`
 - After any `pnpm add/remove`
 - After any commit
 - Before telling the user a URL is ready
@@ -24,7 +23,7 @@ description: >
 
 ```bash
 pkill -f "tsx.*index.ts" 2>/dev/null; sleep 1
-REPO_ROOT=$(git rev-parse --show-toplevel) && cd "$REPO_ROOT/apps/server" && nohup npx tsx src/index.ts > /tmp/supaproxy-server.log 2>&1 &
+REPO_ROOT=$(git rev-parse --show-toplevel) && cd "$REPO_ROOT" && nohup npx tsx src/index.ts > /tmp/supaproxy-server.log 2>&1 &
 sleep 5
 curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health
 # Must be 200
