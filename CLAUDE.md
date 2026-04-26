@@ -39,13 +39,7 @@ src/
     └── audit.ts       Audit logging
 ```
 
-## Related Repos
-
-| Repo | Visibility | Purpose |
-|---|---|---|
-| supaproxy-server (this) | Public (MIT) | Engine: API server |
-| supaproxy-sdk | Public (MIT) | TypeScript SDK (`@supaproxy/sdk` on npm) |
-| supaproxy-dashboard | Private | Astro + React frontend |
+See the [supaproxy repo](https://github.com/NumstackPtyLtd/supaproxy) for the full project overview, cross-repo workflow, and shared code principles.
 
 ## Start Dev
 
@@ -56,6 +50,26 @@ cp .env.example .env               # Configure env vars
 docker compose up -d mysql redis   # MySQL + Redis (reads DB_PASSWORD from .env)
 pnpm dev                           # API on :3001
 ```
+
+## Session workflow
+
+### At the start of every session
+1. Run `git fetch --all` and check recent changes: `git log --all --oneline --since="3 days ago" --no-merges`.
+2. Check if this CLAUDE.md is still accurate (architecture, skills, conventions). Update immediately if outdated.
+
+### Before creating a PR (MANDATORY)
+1. Run quality checks: `pnpm build && pnpm test`.
+2. Self-review the diff against the code rules. Check for: any types, empty catches, hardcoded values, provider names, missing auth.
+3. Check cross-repo impact:
+   - If routes changed: SDK needs a new or updated method. Note this in the PR description.
+   - If `src/shared/` types changed: SDK re-exports may need updating.
+   - If the API contract changed (new/removed/renamed endpoints): this is a breaking change. Note semver impact.
+4. PR description must include a "Cross-repo impact" section listing affected repos and required follow-up.
+
+### After a PR merges to main
+1. If routes or shared types changed: open a follow-up issue or PR in supaproxy-sdk.
+2. If this is a significant release: create a git tag (`git tag vX.Y.Z`).
+3. Notify the team to run `/sync-knowledge` from the docs repo.
 
 ## Stack
 
@@ -79,33 +93,19 @@ pnpm dev                           # API on :3001
 - **Consumers in `consumers/`**. Each consumer handles one external message source and calls into `core/agent.ts`.
 
 ### No Hardcoded Values
-- **No env var fallbacks.** Never `|| 'http://localhost'` or `?? 'default'`. Use `requireEnv()` which throws if missing.
-- **No hardcoded API URLs.** Use environment config.
-- **No hardcoded model IDs in code.** Model options come from the DB or config.
-- **No hardcoded secrets or fallbacks.** JWT secret, DB password, API keys must be required env vars with no default.
-- **No magic numbers.** Timeouts, limits, and thresholds must be named constants or config values.
+- All env vars use `requireEnv()` from `src/config.ts` which throws if missing.
 
-### Provider Agnosticism
-- **No AI provider names in user-facing output.** Say "AI provider", "language model", or "model tier".
-- **No provider-specific token formats as placeholders.** No `sk-ant-`, `xoxb-`, `xapp-`.
+For shared code principles (provider agnosticism, type safety, error handling, security, writing standards), see the [supaproxy CLAUDE.md](https://github.com/NumstackPtyLtd/supaproxy/blob/main/CLAUDE.md#code-principles-apply-everywhere).
 
 ### Type Safety
-- **No `any` types.** Create interfaces for all DB results, API responses, and function parameters.
-- **No `as any` casts.** If TypeScript cannot infer the type, define an interface.
-- **DB row types in `db/types.ts`.** Every `pool.execute<T>()` call uses a typed row interface extending `RowDataPacket`.
+- DB row types in `db/types.ts`. Every `pool.execute<T>()` call uses a typed row interface extending `RowDataPacket`.
 
 ### Error Handling
-- **No empty catch blocks.** Every `.catch()` must log the actual error object.
-- **Check `res.ok` before parsing.** Every `fetch().then(r => r.json())` must check the response status first.
-- **Validate JSON before using.** Wrap `JSON.parse()` in try/catch with fallback.
-- **Log errors with pino.** Use structured logging: `log.error({ error: err.message }, 'Context')`.
+- Log errors with pino. Use structured logging: `log.error({ error: err.message }, 'Context')`.
+- Error responses must not leak internals. No stack traces, file paths, or SQL in client responses.
 
 ### Security
-- **Never commit `.env` files.** Only `.env.example` with placeholders.
-- **Use bcrypt for password hashing.** SHA256 is not acceptable.
-- **JWT secret must be required.** No fallback values. Minimum 32 characters enforced in config.ts.
-- **Cookie `secure: true` in production.** Use `IS_PRODUCTION` from config.
-- **Error responses must not leak internals.** No stack traces, file paths, or SQL in client responses. Log full details server-side.
+- Error responses must not leak internals. No stack traces, file paths, or SQL in client responses. Log full details server-side.
 
 ### Testing
 - **New features need tests.** At minimum: unit tests for services, integration tests for API endpoints.
