@@ -364,6 +364,19 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 8,
+    name: 'add unique constraint on teams (org_id, name)',
+    up: async (pool) => {
+      // Deduplicate any existing duplicates first (keep the earliest)
+      await pool.execute(`
+        DELETE t1 FROM teams t1
+        INNER JOIN teams t2
+        WHERE t1.org_id = t2.org_id AND t1.name = t2.name AND t1.created_at > t2.created_at
+      `);
+      await pool.execute('ALTER TABLE teams ADD UNIQUE KEY unique_org_team (org_id, name)');
+    },
+  },
 ];
 
 interface SchemaMigrationRow extends mysql.RowDataPacket {
