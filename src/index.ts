@@ -56,10 +56,36 @@ app.get('/health', async (c) => {
 })
 
 app.get('/api/models', async (c) => {
-  const [rows] = await pool.execute<ModelRow[]>(
-    "SELECT id, label, is_default FROM models WHERE enabled = 1 ORDER BY sort_order"
+  // Return models for the configured provider, or all if no provider set
+  const [providerRows] = await pool.execute<ValueRow[]>(
+    "SELECT value FROM org_settings WHERE key_name = 'ai_provider'"
   )
-  return c.json({ models: rows })
+  const provider = providerRows[0]?.value
+
+  const [defaultRows] = await pool.execute<ValueRow[]>(
+    "SELECT value FROM org_settings WHERE key_name = 'default_model'"
+  )
+  const defaultModel = defaultRows[0]?.value
+
+  let rows: ModelRow[]
+  if (provider) {
+    [rows] = await pool.execute<ModelRow[]>(
+      "SELECT id, label, is_default FROM models WHERE enabled = 1 AND provider = ? ORDER BY sort_order",
+      [provider]
+    )
+  } else {
+    [rows] = await pool.execute<ModelRow[]>(
+      "SELECT id, label, is_default FROM models WHERE enabled = 1 ORDER BY sort_order"
+    )
+  }
+
+  // Mark the org's chosen default
+  const models = rows.map(r => ({
+    ...r,
+    is_default: r.id === defaultModel,
+  }))
+
+  return c.json({ models })
 })
 
 // Mount route modules

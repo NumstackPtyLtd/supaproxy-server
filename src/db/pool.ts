@@ -18,23 +18,15 @@ export function getPool(): mysql.Pool {
   return pool;
 }
 
-let cachedDefaultModel: string | null = null;
-
-interface DefaultModelRow extends RowDataPacket { id: string }
+interface ValueRow extends RowDataPacket { value: string }
 
 export async function getDefaultModel(): Promise<string> {
-  if (cachedDefaultModel) return cachedDefaultModel;
   const db = getPool();
-  const [rows] = await db.execute<DefaultModelRow[]>(
-    "SELECT id FROM models WHERE is_default = 1 AND enabled = 1 LIMIT 1"
+  const [rows] = await db.execute<ValueRow[]>(
+    "SELECT value FROM org_settings WHERE key_name = 'default_model'"
   );
-  if (!rows[0]?.id) {
-    throw new Error('No default model configured. Add at least one model to the models table with is_default = 1.');
+  if (!rows[0]?.value) {
+    throw new Error('No default model configured. Set a default model in Settings > Integrations.');
   }
-  cachedDefaultModel = rows[0].id;
-  return cachedDefaultModel;
-}
-
-export function clearModelCache(): void {
-  cachedDefaultModel = null;
+  return rows[0].value;
 }

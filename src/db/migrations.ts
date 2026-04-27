@@ -343,7 +343,7 @@ const migrations: Migration[] = [
         CREATE TABLE IF NOT EXISTS models (
           id VARCHAR(100) PRIMARY KEY,
           label VARCHAR(255) NOT NULL,
-          provider VARCHAR(50) NOT NULL DEFAULT 'anthropic',
+          provider VARCHAR(50) NOT NULL,
           enabled BOOLEAN NOT NULL DEFAULT TRUE,
           is_default BOOLEAN NOT NULL DEFAULT FALSE,
           sort_order INT NOT NULL DEFAULT 0,
@@ -351,17 +351,16 @@ const migrations: Migration[] = [
         )
       `);
 
-      // Seed with Anthropic models
+      // Seed with models across providers. No default set —
+      // admin must choose when configuring their AI provider.
       await pool.execute(`
-        INSERT IGNORE INTO models (id, label, provider, enabled, is_default, sort_order) VALUES
-          ('claude-sonnet-4-20250514', 'Claude Sonnet 4', 'anthropic', TRUE, TRUE, 1),
-          ('claude-haiku-4-20250414', 'Claude Haiku 4', 'anthropic', TRUE, FALSE, 2),
-          ('claude-opus-4-20250514', 'Claude Opus 4', 'anthropic', TRUE, FALSE, 3)
-      `);
-
-      // Set existing workspaces with empty model to the default
-      await pool.execute(`
-        UPDATE workspaces SET model = 'claude-sonnet-4-20250514' WHERE model = '' OR model IS NULL
+        INSERT IGNORE INTO models (id, label, provider, enabled, sort_order) VALUES
+          ('claude-sonnet-4-20250514', 'Claude Sonnet 4', 'anthropic', TRUE, 1),
+          ('claude-haiku-4-20250414', 'Claude Haiku 4', 'anthropic', TRUE, 2),
+          ('claude-opus-4-20250514', 'Claude Opus 4', 'anthropic', TRUE, 3),
+          ('gpt-4o', 'GPT-4o', 'openai', TRUE, 4),
+          ('gpt-4o-mini', 'GPT-4o Mini', 'openai', TRUE, 5),
+          ('gpt-4.1', 'GPT-4.1', 'openai', TRUE, 6)
       `);
     },
   },
