@@ -15,6 +15,7 @@ import queuesRouter from './routes/queues.js'
 import workspacesRouter from './routes/workspaces.js'
 import conversationsRouter from './routes/conversations.js'
 import connectorsRouter from './routes/connectors.js'
+import apiKeysRouter from './routes/api-keys.js'
 import queryRouter from './routes/query.js'
 import docs from './openapi.js'
 
@@ -83,6 +84,7 @@ app.route('/', queuesRouter)
 app.route('/', workspacesRouter)
 app.route('/', conversationsRouter)
 app.route('/', connectorsRouter)
+app.route('/', apiKeysRouter)
 app.route('/', queryRouter)
 
 // API docs (mounted last — spec-only routes for /docs, /api/openapi.json, /public/*)

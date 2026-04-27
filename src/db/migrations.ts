@@ -325,6 +325,27 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 6,
+    name: 'add api_keys table',
+    up: async (pool) => {
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS api_keys (
+          id VARCHAR(64) PRIMARY KEY,
+          workspace_id VARCHAR(64) NOT NULL,
+          key_hash VARCHAR(64) NOT NULL,
+          key_prefix VARCHAR(20) NOT NULL,
+          label VARCHAR(255) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          last_used_at TIMESTAMP NULL,
+          revoked_at TIMESTAMP NULL,
+          UNIQUE KEY unique_key_hash (key_hash),
+          INDEX idx_workspace (workspace_id),
+          FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+        )
+      `);
+    },
+  },
 ];
 
 interface SchemaMigrationRow extends mysql.RowDataPacket {

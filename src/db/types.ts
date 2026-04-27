@@ -179,6 +179,17 @@ export interface ModelRow extends RowDataPacket {
   is_default: boolean
 }
 
+export interface ApiKeyRow extends RowDataPacket {
+  id: string
+  workspace_id: string
+  key_hash: string
+  key_prefix: string
+  label: string
+  created_at: string
+  last_used_at: string | null
+  revoked_at: string | null
+}
+
 export interface ColumnInfoRow extends RowDataPacket {
   Field: string
   Type: string
