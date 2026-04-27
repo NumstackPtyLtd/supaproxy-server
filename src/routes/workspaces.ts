@@ -263,10 +263,11 @@ workspaces.use('/api/workspaces', requireAuth)
 workspaces.use('/api/teams', requireAuth)
 workspaces.use('/api/connections/*', requireAuth)
 
-// List teams
+// List teams (scoped to authenticated user's org)
 workspaces.get('/api/teams', async (c) => {
   const db = getPool()
-  const [teams] = await db.execute<TeamRow[]>('SELECT id, name FROM teams ORDER BY name')
+  const user = c.get('user') as AuthUser
+  const [teams] = await db.execute<TeamRow[]>('SELECT id, name FROM teams WHERE org_id = ? ORDER BY name', [user.org_id])
   return c.json({ teams })
 })
 
