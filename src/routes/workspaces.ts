@@ -292,11 +292,27 @@ workspaces.post('/api/workspaces', async (c) => {
       resolvedTeamId = existing[0].id
     } else {
       resolvedTeamId = randomBytes(16).toString('hex')
-      await db.execute(
-        'INSERT INTO teams (id, org_id, name) VALUES (?, ?, ?)',
-        [resolvedTeamId, resolvedOrgId, team_name]
-      )
-      log.info({ team: team_name }, 'Team created')
+      try {
+        await db.execute(
+          'INSERT INTO teams (id, org_id, name) VALUES (?, ?, ?)',
+          [resolvedTeamId, resolvedOrgId, team_name]
+        )
+        log.info({ team: team_name }, 'Team created')
+      } catch (err: unknown) {
+        // Unique constraint violation — team was created by a concurrent request
+        if ((err as { code?: string }).code === 'ER_DUP_ENTRY') {
+          const [retry] = await db.execute<IdRow[]>(
+            'SELECT id FROM teams WHERE org_id = ? AND name = ?', [resolvedOrgId, team_name]
+          )
+          if (retry[0]) {
+            resolvedTeamId = retry[0].id
+          } else {
+            return c.json({ error: 'Failed to resolve team.' }, 500)
+          }
+        } else {
+          throw err
+        }
+      }
     }
   }
 
