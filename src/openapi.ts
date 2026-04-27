@@ -218,6 +218,31 @@ const SlackConnectorBody = z.object({
   channel_id: z.string().max(100).optional(),
 }).openapi('SlackConnectorBody')
 
+const ApiKey = z.object({
+  id: z.string(),
+  prefix: z.string().openapi({ description: 'First 16 characters of the key, for identification only' }),
+  label: z.string(),
+  created_at: z.string(),
+  last_used_at: z.string().nullable(),
+}).openapi('ApiKey')
+
+const ApiKeyListResponse = z.object({
+  keys: z.array(ApiKey),
+}).openapi('ApiKeyListResponse')
+
+const CreateApiKeyBody = z.object({
+  label: z.string().min(1).max(255),
+  test: z.boolean().optional().openapi({ description: 'If true, generates a sp_test_ key. Test keys bypass rate limits and billing.' }),
+}).openapi('CreateApiKeyBody')
+
+const CreateApiKeyResponse = z.object({
+  id: z.string(),
+  key: z.string().openapi({ description: 'The full API key — shown once only, never retrievable again' }),
+  prefix: z.string(),
+  label: z.string(),
+  created_at: z.string(),
+}).openapi('CreateApiKeyResponse')
+
 // ── OpenAPI spec app ──────────────────────────────────────────────
 
 const docs = new OpenAPIHono()
@@ -541,6 +566,58 @@ docs.openapi(createRoute({
   responses: { 200: { description: 'Connected', content: { 'application/json': { schema: z.object({ status: z.string(), message: z.string() }) } } } },
 }), (c) => c.json({} as never))
 
+// --- API Keys ---
+
+docs.openapi(createRoute({
+  method: 'post', path: '/api/workspaces/{id}/api-keys', tags: tag('API Keys'),
+  summary: 'Create an API key for a workspace',
+  description: 'Creates a new API key scoped to the workspace. The full key is returned exactly once — it is hashed before storage and cannot be retrieved again.',
+  security: [{ cookieAuth: [] }],
+  request: {
+    params: z.object({ id: z.string().openapi({ param: { name: 'id', in: 'path' } }) }),
+    body: { content: { 'application/json': { schema: CreateApiKeyBody } } },
+  },
+  responses: {
+    201: { description: 'Key created. Store it now — it will not be shown again.', content: { 'application/json': { schema: CreateApiKeyResponse } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponse } } },
+    401: { description: 'Not authenticated', content: { 'application/json': { schema: ErrorResponse } } },
+    404: { description: 'Workspace not found', content: { 'application/json': { schema: ErrorResponse } } },
+  },
+}), (c) => c.json({} as never))
+
+docs.openapi(createRoute({
+  method: 'get', path: '/api/workspaces/{id}/api-keys', tags: tag('API Keys'),
+  summary: 'List API keys for a workspace',
+  description: 'Returns active (non-revoked) keys with prefix and metadata. The raw key value is never returned.',
+  security: [{ cookieAuth: [] }],
+  request: {
+    params: z.object({ id: z.string().openapi({ param: { name: 'id', in: 'path' } }) }),
+  },
+  responses: {
+    200: { description: 'Active keys', content: { 'application/json': { schema: ApiKeyListResponse } } },
+    401: { description: 'Not authenticated', content: { 'application/json': { schema: ErrorResponse } } },
+    404: { description: 'Workspace not found', content: { 'application/json': { schema: ErrorResponse } } },
+  },
+}), (c) => c.json({} as never))
+
+docs.openapi(createRoute({
+  method: 'delete', path: '/api/workspaces/{id}/api-keys/{keyId}', tags: tag('API Keys'),
+  summary: 'Revoke an API key',
+  description: 'Immediately revokes the key. Any requests using it will receive 401 after this point.',
+  security: [{ cookieAuth: [] }],
+  request: {
+    params: z.object({
+      id: z.string().openapi({ param: { name: 'id', in: 'path' } }),
+      keyId: z.string().openapi({ param: { name: 'keyId', in: 'path' } }),
+    }),
+  },
+  responses: {
+    200: { description: 'Key revoked', content: { 'application/json': { schema: z.object({ status: z.literal('revoked'), message: z.string() }) } } },
+    401: { description: 'Not authenticated', content: { 'application/json': { schema: ErrorResponse } } },
+    404: { description: 'Key not found', content: { 'application/json': { schema: ErrorResponse } } },
+  },
+}), (c) => c.json({} as never))
+
 // --- Query ---
 
 docs.openapi(createRoute({
@@ -580,6 +657,7 @@ docs.doc('/api/openapi.json', {
     { name: 'Compliance', description: 'Guardrails and violation tracking' },
     { name: 'Conversations', description: 'Conversation lifecycle, messages, and analytics' },
     { name: 'Connectors', description: 'Connect MCP servers and Slack bots' },
+    { name: 'API Keys', description: 'Workspace API keys for programmatic and MCP access' },
     { name: 'Query', description: 'Send queries to workspace agents' },
   ],
   security: [],

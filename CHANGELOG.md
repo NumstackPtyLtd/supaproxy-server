@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- API key management: `POST/GET/DELETE /api/workspaces/:id/api-keys` routes for creating, listing, and revoking workspace API keys
+- `requireApiKey` middleware and `ApiKeyEnv` type — bearer token auth path for the MCP server
+- `api_keys` table (migration 6): hashed key storage, display prefix, label, audit timestamps
+- OpenAPI documentation for all three API key routes under the new `API Keys` tag
+
 ## [0.1.0] - 2026-04-25
 
 ### Added

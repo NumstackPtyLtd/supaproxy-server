@@ -10,7 +10,7 @@ src/
 ├── index.ts           Hono app, health check, route mounts
 ├── shared/            Types, entities, API contracts
 ├── middleware/
-│   ├── auth.ts        requireAuth (JWT cookie verification)
+│   ├── auth.ts        requireAuth (JWT cookie), requireApiKey (bearer token for MCP)
 │   └── validate.ts    parseBody (Zod schema validation)
 ├── routes/            Modular Hono routers
 │   ├── auth.ts        Login, logout, session, signup
@@ -19,6 +19,7 @@ src/
 │   ├── workspaces.ts  Workspace CRUD, dashboard, activity
 │   ├── conversations.ts Conversation list, detail, close
 │   ├── connectors.ts  MCP + Slack connectors
+│   ├── api-keys.ts    Workspace API key management (create, list, revoke)
 │   └── query.ts       Agent loop entry point
 ├── core/              Business logic
 │   ├── agent.ts       AI + MCP tool orchestration

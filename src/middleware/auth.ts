@@ -1,10 +1,13 @@
 import { getCookie } from 'hono/cookie'
 import { createHash } from 'crypto'
 import jwt from 'jsonwebtoken'
+import pino from 'pino'
 import { JWT_SECRET } from '../config.js'
 import { getPool } from '../db/pool.js'
 import type { ApiKeyRow } from '../db/types.js'
 import type { Context, Next } from 'hono'
+
+const log = pino({ name: 'middleware/auth' })
 
 export interface AuthUser {
   id: string
@@ -66,7 +69,9 @@ export async function requireApiKey(c: Context, next: Next) {
   c.set('is_test_key', key.startsWith('sp_test_'))
 
   // Update last_used_at without blocking the request
-  db.execute('UPDATE api_keys SET last_used_at = NOW() WHERE id = ?', [apiKey.id]).catch(() => {})
+  db.execute('UPDATE api_keys SET last_used_at = NOW() WHERE id = ?', [apiKey.id]).catch((err: unknown) => {
+    log.warn({ error: (err as Error).message, keyId: apiKey.id }, 'Failed to update api key last_used_at')
+  })
 
   await next()
 }
