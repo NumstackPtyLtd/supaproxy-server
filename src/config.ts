@@ -52,5 +52,3 @@ export const REDIS_PORT = requireEnvInt('REDIS_PORT')
 // Audit
 export const LOG_DIR = process.env.SUPAPROXY_LOG_DIR || './var/logs'
 
-// Default model for new workspaces (optional — model is set per-workspace)
-export const DEFAULT_MODEL = process.env.DEFAULT_MODEL || ''

@@ -6,7 +6,7 @@ import { z } from 'zod'
 import pino from 'pino'
 import { getPool } from '../db/pool.js'
 import { findUserByEmail, verifyPassword, hashPassword } from '../auth/db.js'
-import { JWT_SECRET, DASHBOARD_URL, IS_PRODUCTION, DEFAULT_MODEL, COOKIE_DOMAIN } from '../config.js'
+import { JWT_SECRET, DASHBOARD_URL, IS_PRODUCTION, COOKIE_DOMAIN } from '../config.js'
 import { parseBody } from '../middleware/validate.js'
 import type { IdRow } from '../db/types.js'
 
@@ -62,8 +62,8 @@ auth.post('/api/signup', async (c) => {
 
   await db.execute(
     `INSERT INTO workspaces (id, org_id, team_id, name, status, model, system_prompt, max_tool_rounds, created_by)
-     VALUES (?, ?, ?, ?, 'active', ?, ?, 10, ?)`,
-    [wsId, orgId, teamId, workspace_name, DEFAULT_MODEL, system_prompt || 'You are a helpful assistant.', userId]
+     VALUES (?, ?, ?, ?, 'active', '', ?, 10, ?)`,
+    [wsId, orgId, teamId, workspace_name, system_prompt || 'You are a helpful assistant.', userId]
   )
 
   const token = jwt.sign(
