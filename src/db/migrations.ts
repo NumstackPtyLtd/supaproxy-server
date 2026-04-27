@@ -335,6 +335,36 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 7,
+    name: 'add models table',
+    up: async (pool) => {
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS models (
+          id VARCHAR(100) PRIMARY KEY,
+          label VARCHAR(255) NOT NULL,
+          provider VARCHAR(50) NOT NULL DEFAULT 'anthropic',
+          enabled BOOLEAN NOT NULL DEFAULT TRUE,
+          is_default BOOLEAN NOT NULL DEFAULT FALSE,
+          sort_order INT NOT NULL DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Seed with Anthropic models
+      await pool.execute(`
+        INSERT IGNORE INTO models (id, label, provider, enabled, is_default, sort_order) VALUES
+          ('claude-sonnet-4-20250514', 'Claude Sonnet 4', 'anthropic', TRUE, TRUE, 1),
+          ('claude-haiku-4-20250414', 'Claude Haiku 4', 'anthropic', TRUE, FALSE, 2),
+          ('claude-opus-4-20250514', 'Claude Opus 4', 'anthropic', TRUE, FALSE, 3)
+      `);
+
+      // Set existing workspaces with empty model to the default
+      await pool.execute(`
+        UPDATE workspaces SET model = 'claude-sonnet-4-20250514' WHERE model = '' OR model IS NULL
+      `);
+    },
+  },
 ];
 
 interface SchemaMigrationRow extends mysql.RowDataPacket {

@@ -3,7 +3,8 @@ import pino from 'pino';
 import type { TextBlock } from '@anthropic-ai/sdk/resources/messages.js';
 import { transitionColdConversations, transitionClosedConversations, generateConversationStats } from './conversation.js';
 
-import { REDIS_HOST, REDIS_PORT, DEFAULT_MODEL } from '../config.js';
+import { REDIS_HOST, REDIS_PORT } from '../config.js';
+import { getDefaultModel } from '../db/pool.js';
 import type { ValueRow } from '../db/types.js';
 
 const log = pino({ name: 'lifecycle' });
@@ -59,8 +60,9 @@ async function generateColdMessage(conversationId: string): Promise<string> {
 
     const transcript = messages.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n\n');
 
+    const model = await getDefaultModel();
     const response = await anthropic.messages.create({
-      model: DEFAULT_MODEL,
+      model,
       max_tokens: 150,
       messages: [{
         role: 'user',

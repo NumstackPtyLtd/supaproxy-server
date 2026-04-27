@@ -2,8 +2,7 @@ import pino from 'pino';
 import { randomBytes } from 'crypto';
 import type { RowDataPacket } from 'mysql2';
 import type { TextBlock } from '@anthropic-ai/sdk/resources/messages.js';
-import { getPool } from '../db/pool.js';
-import { DEFAULT_MODEL } from '../config.js';
+import { getPool, getDefaultModel } from '../db/pool.js';
 import type { ConversationRow, ConversationStatsRow, IdRow, ValueRow } from '../db/types.js';
 
 const log = pino({ name: 'conversation' });
@@ -246,7 +245,7 @@ export async function generateConversationStats(conversationId: string) {
       "SELECT w.model FROM workspaces w JOIN conversations c ON c.workspace_id = w.id WHERE c.id = ?",
       [conversationId]
     );
-    const statsModel = wsRows[0]?.model || DEFAULT_MODEL;
+    const statsModel = wsRows[0]?.model || await getDefaultModel();
 
     const anthropic = new Anthropic({ apiKey });
     const response = await anthropic.messages.create({

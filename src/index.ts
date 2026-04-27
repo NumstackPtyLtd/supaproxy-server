@@ -5,7 +5,7 @@ import { cors } from 'hono/cors'
 import pino from 'pino'
 import { getPool } from './db/pool.js'
 import { runMigrations } from './db/migrations.js'
-import { CORS_ORIGINS, DASHBOARD_URL, PORT, DEFAULT_MODEL } from './config.js'
+import { CORS_ORIGINS, DASHBOARD_URL, PORT } from './config.js'
 import type { CountRow, ValueRow, ModelRow } from './db/types.js'
 
 // Route modules
@@ -55,25 +55,11 @@ app.get('/health', async (c) => {
   }
 })
 
-// Models — served from DB in production, this is the bootstrap fallback
 app.get('/api/models', async (c) => {
-  try {
-    const [rows] = await pool.execute<ModelRow[]>(
-      "SELECT id, label, is_default FROM models WHERE enabled = 1 ORDER BY sort_order"
-    )
-    if (rows.length > 0) {
-      return c.json({ models: rows })
-    }
-  } catch (err) {
-    // Table may not exist yet — fall through to fallback
-    log.warn({ error: err instanceof Error ? err.message : err }, 'Models table query failed, using fallback')
-  }
-  // Fallback: return configured default model
-  return c.json({
-    models: [
-      { id: DEFAULT_MODEL, label: 'Default', is_default: true },
-    ],
-  })
+  const [rows] = await pool.execute<ModelRow[]>(
+    "SELECT id, label, is_default FROM models WHERE enabled = 1 ORDER BY sort_order"
+  )
+  return c.json({ models: rows })
 })
 
 // Mount route modules
