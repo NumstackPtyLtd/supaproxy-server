@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { z } from 'zod'
 import pino from 'pino'
 import type { RowDataPacket } from 'mysql2'
-import { getPool, getDefaultModel } from '../db/pool.js'
+import { getPool } from '../db/pool.js'
 import { parseBody } from '../middleware/validate.js'
 import { requireAuth, type AuthUser, type AuthEnv } from '../middleware/auth.js'
 import type {
@@ -236,6 +236,7 @@ interface KnowledgeGapItem {
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(1, 'Workspace name is required').max(255),
+  model: z.string().min(1, 'Model is required').max(100),
   team_id: z.string().max(255).optional(),
   team_name: z.string().max(255).optional(),
   system_prompt: z.string().max(10000).optional(),
@@ -274,7 +275,7 @@ workspaces.post('/api/workspaces', async (c) => {
   const db = getPool()
   const result = await parseBody(c, createWorkspaceSchema)
   if (!result.success) return result.response
-  const { name, team_id, team_name, system_prompt, org_id } = result.data
+  const { name, model, team_id, team_name, system_prompt, org_id } = result.data
 
   // Resolve org_id from request body or authenticated user
   const user = c.get('user') as AuthUser
@@ -305,11 +306,10 @@ workspaces.post('/api/workspaces', async (c) => {
     return c.json({ error: 'A workspace with this name already exists.' }, 400)
   }
 
-  const defaultModel = await getDefaultModel()
   await db.execute(
     `INSERT INTO workspaces (id, org_id, team_id, name, status, model, system_prompt, max_tool_rounds)
      VALUES (?, ?, ?, ?, 'active', ?, ?, 10)`,
-    [wsId, resolvedOrgId || null, resolvedTeamId || null, name, defaultModel, system_prompt || 'You are a helpful assistant.']
+    [wsId, resolvedOrgId || null, resolvedTeamId || null, name, model, system_prompt || 'You are a helpful assistant.']
   )
 
   log.info({ workspace: wsId, name }, 'Workspace created')
