@@ -305,12 +305,17 @@ connectors.post('/api/connectors/slack', async (c) => {
     )
   }
 
-  try {
-    await consumerTypes.slack.start!(credentials)
-    return c.json({ status: 'ok', message: 'Connected. The Slack consumer is now active.' })
-  } catch (err) {
-    return c.json({ status: 'ok', message: `Credentials saved but the consumer could not start: ${(err as Error).message}. Check the credentials and try again.` })
+  const starter = consumerTypes.slack.start
+  if (starter) {
+    try {
+      await starter(credentials)
+      return c.json({ status: 'ok', message: 'Connected. The Slack consumer is now active.' })
+    } catch (err) {
+      return c.json({ status: 'ok', message: `Credentials saved but the consumer could not start: ${(err as Error).message}. Check the credentials and try again.` })
+    }
   }
+
+  return c.json({ status: 'ok', message: 'Consumer configured.' })
 })
 
 // Test MCP connection
