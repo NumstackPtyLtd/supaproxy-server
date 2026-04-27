@@ -40,7 +40,7 @@ auth.post('/api/signup', async (c) => {
 
   const orgId = randomBytes(16).toString('hex')
   const userId = randomBytes(16).toString('hex')
-  const teamId = randomBytes(16).toString('hex')
+  let teamId = randomBytes(16).toString('hex')
   const slug = org_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
   const wsId = `ws-${workspace_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}`
 
@@ -55,10 +55,21 @@ auth.post('/api/signup', async (c) => {
     [userId, orgId, admin_email, admin_name, hash, 'admin']
   )
 
-  await db.execute(
-    'INSERT INTO teams (id, org_id, name) VALUES (?, ?, ?)',
-    [teamId, orgId, team_name]
-  )
+  try {
+    await db.execute(
+      'INSERT INTO teams (id, org_id, name) VALUES (?, ?, ?)',
+      [teamId, orgId, team_name]
+    )
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === 'ER_DUP_ENTRY') {
+      const [existing] = await db.execute<IdRow[]>(
+        'SELECT id FROM teams WHERE org_id = ? AND name = ?', [orgId, team_name]
+      )
+      if (existing[0]) teamId = existing[0].id
+    } else {
+      throw err
+    }
+  }
 
   await db.execute(
     `INSERT INTO workspaces (id, org_id, team_id, name, status, model, system_prompt, max_tool_rounds, created_by)

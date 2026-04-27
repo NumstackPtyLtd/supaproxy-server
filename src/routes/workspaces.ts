@@ -263,10 +263,11 @@ workspaces.use('/api/workspaces', requireAuth)
 workspaces.use('/api/teams', requireAuth)
 workspaces.use('/api/connections/*', requireAuth)
 
-// List teams
+// List teams (scoped to authenticated user's org)
 workspaces.get('/api/teams', async (c) => {
   const db = getPool()
-  const [teams] = await db.execute<TeamRow[]>('SELECT id, name FROM teams ORDER BY name')
+  const user = c.get('user') as AuthUser
+  const [teams] = await db.execute<TeamRow[]>('SELECT id, name FROM teams WHERE org_id = ? ORDER BY name', [user.org_id])
   return c.json({ teams })
 })
 
@@ -291,11 +292,27 @@ workspaces.post('/api/workspaces', async (c) => {
       resolvedTeamId = existing[0].id
     } else {
       resolvedTeamId = randomBytes(16).toString('hex')
-      await db.execute(
-        'INSERT INTO teams (id, org_id, name) VALUES (?, ?, ?)',
-        [resolvedTeamId, resolvedOrgId, team_name]
-      )
-      log.info({ team: team_name }, 'Team created')
+      try {
+        await db.execute(
+          'INSERT INTO teams (id, org_id, name) VALUES (?, ?, ?)',
+          [resolvedTeamId, resolvedOrgId, team_name]
+        )
+        log.info({ team: team_name }, 'Team created')
+      } catch (err: unknown) {
+        // Unique constraint violation — team was created by a concurrent request
+        if ((err as { code?: string }).code === 'ER_DUP_ENTRY') {
+          const [retry] = await db.execute<IdRow[]>(
+            'SELECT id FROM teams WHERE org_id = ? AND name = ?', [resolvedOrgId, team_name]
+          )
+          if (retry[0]) {
+            resolvedTeamId = retry[0].id
+          } else {
+            return c.json({ error: 'Failed to resolve team.' }, 500)
+          }
+        } else {
+          throw err
+        }
+      }
     }
   }
 
