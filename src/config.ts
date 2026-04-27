@@ -23,7 +23,7 @@ export const JWT_SECRET = (() => {
   return secret
 })()
 export const CORS_ORIGINS = requireEnv('CORS_ORIGINS').split(',')
-export const DASHBOARD_URL = process.env.DASHBOARD_URL || ''
+export const DASHBOARD_URL = requireEnv('DASHBOARD_URL')
 
 // Cookie domain — derived from DASHBOARD_URL so cookies work across subdomains
 // e.g. https://supaproxy.cloud → .supaproxy.cloud
