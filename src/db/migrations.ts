@@ -325,6 +325,16 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 6,
+    name: 'add fraud_indicators to conversation_stats',
+    up: async (pool) => {
+      const [cols] = await pool.execute<ColumnInfoRow[]>("SHOW COLUMNS FROM conversation_stats LIKE 'fraud_indicators'");
+      if (cols.length === 0) {
+        await pool.execute("ALTER TABLE conversation_stats ADD COLUMN fraud_indicators JSON AFTER knowledge_gaps");
+      }
+    },
+  },
 ];
 
 interface SchemaMigrationRow extends mysql.RowDataPacket {
