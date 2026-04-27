@@ -42,12 +42,14 @@ app.get('/health', async (c) => {
     const [wsRows] = await pool.execute<CountRow[]>('SELECT COUNT(*) as c FROM workspaces WHERE status = "active"')
     const [aiRows] = await pool.execute<ValueRow[]>("SELECT value FROM org_settings WHERE key_name IN ('ai_api_key', 'anthropic_api_key') AND value IS NOT NULL AND value != '' LIMIT 1")
     const [connRows] = await pool.execute<CountRow[]>("SELECT COUNT(*) as c FROM connections WHERE status = 'connected'")
+    const [consumerRows] = await pool.execute<CountRow[]>("SELECT COUNT(*) as c FROM consumers WHERE status = 'active'")
     return c.json({
       status: 'ok',
       setup_complete: orgRows[0].c > 0,
       workspaces: wsRows[0].c,
       ai_configured: aiRows[0]?.value ? true : false,
       connections: connRows[0].c,
+      consumers: consumerRows[0].c,
     })
   } catch (err) {
     log.error({ error: (err as Error).message }, 'Health check failed')
