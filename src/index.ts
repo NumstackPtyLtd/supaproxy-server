@@ -5,7 +5,9 @@ import { cors } from 'hono/cors'
 import pino from 'pino'
 import { getPool } from './db/pool.js'
 import { runMigrations } from './db/migrations.js'
-import { CORS_ORIGINS, DASHBOARD_URL, PORT } from './config.js'
+import { CORS_ORIGINS, DASHBOARD_URL, PORT, JWT_SECRET } from './config.js'
+import { getCookie } from 'hono/cookie'
+import jwt from 'jsonwebtoken'
 import type { CountRow, ValueRow, ModelRow } from './db/types.js'
 
 // Route modules
@@ -35,9 +37,18 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal Server Error' }, 500)
 })
 
-// Health check
+// Health check — public returns basic status, authenticated returns full details
 app.get('/health', async (c) => {
   try {
+    const token = getCookie(c, 'supaproxy_session')
+    let authenticated = false
+    if (token) {
+      try { jwt.verify(token, JWT_SECRET); authenticated = true } catch {}
+    }
+    if (!authenticated) {
+      return c.json({ status: 'ok' })
+    }
+
     const [orgRows] = await pool.execute<CountRow[]>('SELECT COUNT(*) as c FROM organisations')
     const [wsRows] = await pool.execute<CountRow[]>('SELECT COUNT(*) as c FROM workspaces WHERE status = "active"')
     const [aiRows] = await pool.execute<ValueRow[]>("SELECT value FROM org_settings WHERE key_name IN ('ai_api_key', 'anthropic_api_key') AND value IS NOT NULL AND value != '' LIMIT 1")
@@ -53,7 +64,7 @@ app.get('/health', async (c) => {
     })
   } catch (err) {
     log.error({ error: (err as Error).message }, 'Health check failed')
-    return c.json({ status: 'error', message: (err as Error).message }, 500)
+    return c.json({ status: 'error' }, 500)
   }
 })
 
