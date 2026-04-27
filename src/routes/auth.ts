@@ -6,7 +6,7 @@ import { z } from 'zod'
 import pino from 'pino'
 import { getPool } from '../db/pool.js'
 import { findUserByEmail, verifyPassword, hashPassword } from '../auth/db.js'
-import { JWT_SECRET, DASHBOARD_URL, IS_PRODUCTION, DEFAULT_MODEL } from '../config.js'
+import { JWT_SECRET, DASHBOARD_URL, IS_PRODUCTION, DEFAULT_MODEL, COOKIE_DOMAIN } from '../config.js'
 import { parseBody } from '../middleware/validate.js'
 import type { IdRow } from '../db/types.js'
 
@@ -78,6 +78,7 @@ auth.post('/api/signup', async (c) => {
     sameSite: 'Lax',
     path: '/',
     maxAge: SESSION_MAX_AGE,
+    ...(COOKIE_DOMAIN && { domain: COOKIE_DOMAIN }),
   })
 
   log.info({ org: org_name, admin: admin_email, workspace: wsId }, 'Setup complete — org, admin, team, workspace created')
@@ -137,6 +138,7 @@ auth.post('/api/auth/login', async (c) => {
     sameSite: 'Lax',
     path: '/',
     maxAge: SESSION_MAX_AGE,
+    ...(COOKIE_DOMAIN && { domain: COOKIE_DOMAIN }),
   })
 
   if (isFormSubmit && DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/workspaces`)
@@ -169,7 +171,7 @@ auth.get('/api/auth/session', (c) => {
 
 // --- Logout ---
 auth.get('/api/auth/logout', (c) => {
-  setCookie(c, 'supaproxy_session', '', { path: '/', maxAge: 0 })
+  setCookie(c, 'supaproxy_session', '', { path: '/', maxAge: 0, ...(COOKIE_DOMAIN && { domain: COOKIE_DOMAIN }) })
   if (DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/login`)
   return c.json({ status: 'ok' })
 })

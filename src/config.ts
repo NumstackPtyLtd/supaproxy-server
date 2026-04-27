@@ -24,6 +24,18 @@ export const JWT_SECRET = (() => {
 })()
 export const CORS_ORIGINS = requireEnv('CORS_ORIGINS').split(',')
 export const DASHBOARD_URL = process.env.DASHBOARD_URL || ''
+
+// Cookie domain — derived from DASHBOARD_URL so cookies work across subdomains
+// e.g. https://supaproxy.cloud → .supaproxy.cloud
+export const COOKIE_DOMAIN = (() => {
+  if (!DASHBOARD_URL) return undefined
+  try {
+    const host = new URL(DASHBOARD_URL).hostname
+    return host.startsWith('.') ? host : `.${host}`
+  } catch {
+    return undefined
+  }
+})()
 export const PORT = requireEnvInt('PORT')
 
 // Database
