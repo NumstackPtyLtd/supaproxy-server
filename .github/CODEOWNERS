@@ -1,8 +1,2 @@
 # Default owner for everything
 * @kopahead
-
-# Server
-apps/server/ @kopahead
-
-# Packages
-packages/ @kopahead
