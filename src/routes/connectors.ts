@@ -57,6 +57,19 @@ const consumerConnectSchema = z.object({
   channel_id: z.string().max(100).optional(),
 })
 
+const slackChannelSchema = z.object({
+  workspace_id: z.string().min(1, 'workspace_id is required').max(255),
+  channel_id: z.string().min(1, 'channel_id is required').max(100),
+  channel_name: z.string().max(255).optional(),
+})
+
+const slackConnectSchema = z.object({
+  workspace_id: z.string().min(1, 'workspace_id is required').max(255),
+  bot_token: z.string().min(1, 'bot_token is required').max(500),
+  app_token: z.string().min(1, 'app_token is required').max(500),
+  channel_id: z.string().max(100).optional(),
+})
+
 const mcpTestSchema = z.object({
   transport: z.enum(['http', 'stdio']).optional(),
   url: z.string().url().max(2048).optional(),
@@ -215,6 +228,94 @@ connectors.post('/api/connectors/consumer', async (c) => {
   }
 
   return c.json({ status: 'saved', message: 'Consumer configured.' })
+})
+
+// Bind a Slack channel to a workspace (SDK-facing shorthand)
+connectors.post('/api/connectors/slack-channel', async (c) => {
+  const db = getPool()
+  const result = await parseBody(c, slackChannelSchema)
+  if (!result.success) return result.response
+  const { workspace_id, channel_id, channel_name } = result.data
+
+  const [wsRows] = await db.execute<IdRow[]>('SELECT id FROM workspaces WHERE id = ?', [workspace_id])
+  if (!wsRows[0]) return c.json({ error: 'Workspace not found' }, 404)
+
+  const [bound] = await db.execute<BoundConsumerRow[]>(
+    `SELECT c.workspace_id, w.name as workspace_name FROM consumers c
+     JOIN workspaces w ON c.workspace_id = w.id
+     WHERE c.type = 'slack' AND c.workspace_id != ? AND JSON_CONTAINS(c.config, JSON_QUOTE(?), '$.channels')`,
+    [workspace_id, channel_id]
+  )
+  if (bound[0]) {
+    return c.json({ error: `This channel is already bound to "${bound[0].workspace_name}". A channel can only belong to one workspace.` }, 400)
+  }
+
+  const config = JSON.stringify({
+    channels: [channel_id],
+    channel_name: channel_name || `#${channel_id}`,
+    allow_dms: true,
+    thread_context: true,
+  })
+
+  const [existing] = await db.execute<IdRow[]>(
+    'SELECT id FROM consumers WHERE workspace_id = ? AND type = "slack"', [workspace_id]
+  )
+
+  if (existing[0]) {
+    await db.execute('UPDATE consumers SET config = ?, status = "active" WHERE id = ?', [config, existing[0].id])
+  } else {
+    await db.execute(
+      'INSERT INTO consumers (id, workspace_id, type, config, status) VALUES (?, ?, "slack", ?, "active")',
+      [randomBytes(16).toString('hex'), workspace_id, config]
+    )
+  }
+
+  return c.json({ status: 'ok', message: `Channel ${channel_name || channel_id} bound to this workspace.` })
+})
+
+// Connect Slack bot to a workspace with credentials (SDK-facing shorthand)
+connectors.post('/api/connectors/slack', async (c) => {
+  const db = getPool()
+  const result = await parseBody(c, slackConnectSchema)
+  if (!result.success) return result.response
+  const { workspace_id, bot_token, app_token, channel_id } = result.data
+
+  const [wsRows] = await db.execute<IdRow[]>('SELECT id FROM workspaces WHERE id = ?', [workspace_id])
+  if (!wsRows[0]) return c.json({ error: 'Workspace not found' }, 404)
+
+  const credentials = { bot_token, app_token }
+  try {
+    await verifySlackCredentials(credentials)
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 400)
+  }
+
+  const config = consumerTypes.slack.buildConfig(credentials, channel_id)
+
+  const [existing] = await db.execute<IdRow[]>(
+    'SELECT id FROM consumers WHERE workspace_id = ? AND type = "slack"', [workspace_id]
+  )
+
+  if (existing[0]) {
+    await db.execute('UPDATE consumers SET config = ?, status = "active" WHERE id = ?', [config, existing[0].id])
+  } else {
+    await db.execute(
+      'INSERT INTO consumers (id, workspace_id, type, config, status) VALUES (?, ?, "slack", ?, "active")',
+      [randomBytes(16).toString('hex'), workspace_id, config]
+    )
+  }
+
+  const starter = consumerTypes.slack.start
+  if (starter) {
+    try {
+      await starter(credentials)
+      return c.json({ status: 'ok', message: 'Connected. The Slack consumer is now active.' })
+    } catch (err) {
+      return c.json({ status: 'ok', message: `Credentials saved but the consumer could not start: ${(err as Error).message}. Check the credentials and try again.` })
+    }
+  }
+
+  return c.json({ status: 'ok', message: 'Consumer configured.' })
 })
 
 // Test MCP connection
