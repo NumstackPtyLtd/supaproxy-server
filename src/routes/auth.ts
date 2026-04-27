@@ -121,19 +121,19 @@ auth.post('/api/auth/login', async (c) => {
   }
 
   if (!email || !password) {
-    if (isFormSubmit && DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/login?error=missing_fields`)
+    if (isFormSubmit) return c.redirect(`${DASHBOARD_URL}/login?error=missing_fields`)
     return c.json({ error: 'Email and password are required.' }, 400)
   }
 
   const user = await findUserByEmail(email)
   if (!user) {
-    if (isFormSubmit && DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/login?error=invalid_credentials`)
+    if (isFormSubmit) return c.redirect(`${DASHBOARD_URL}/login?error=invalid_credentials`)
     return c.json({ error: 'Invalid credentials.' }, 401)
   }
 
   const valid = await verifyPassword(password, user.password_hash)
   if (!valid) {
-    if (isFormSubmit && DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/login?error=invalid_credentials`)
+    if (isFormSubmit) return c.redirect(`${DASHBOARD_URL}/login?error=invalid_credentials`)
     return c.json({ error: 'Invalid credentials.' }, 401)
   }
 
@@ -152,7 +152,7 @@ auth.post('/api/auth/login', async (c) => {
     ...(COOKIE_DOMAIN && { domain: COOKIE_DOMAIN }),
   })
 
-  if (isFormSubmit && DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/workspaces`)
+  if (isFormSubmit) return c.redirect(`${DASHBOARD_URL}/workspaces`)
   return c.json({
     status: 'ok',
     user: { id: user.id, email: user.email, name: user.name, role: user.org_role },
@@ -183,8 +183,7 @@ auth.get('/api/auth/session', (c) => {
 // --- Logout ---
 auth.get('/api/auth/logout', (c) => {
   setCookie(c, 'supaproxy_session', '', { path: '/', maxAge: 0, ...(COOKIE_DOMAIN && { domain: COOKIE_DOMAIN }) })
-  if (DASHBOARD_URL) return c.redirect(`${DASHBOARD_URL}/login`)
-  return c.json({ status: 'ok' })
+  return c.redirect(`${DASHBOARD_URL}/login`)
 })
 
 export default auth
