@@ -1,0 +1,172 @@
+import { Hono } from 'hono'
+import { z } from 'zod'
+import pino from 'pino'
+import type { CreateWorkspaceUseCase } from '../../application/workspace/CreateWorkspaceUseCase.js'
+import type { UpdateWorkspaceUseCase } from '../../application/workspace/UpdateWorkspaceUseCase.js'
+import type { GetWorkspaceDetailUseCase } from '../../application/workspace/GetWorkspaceDetailUseCase.js'
+import type { ListWorkspacesUseCase } from '../../application/workspace/ListWorkspacesUseCase.js'
+import type { GetWorkspaceSummaryUseCase } from '../../application/workspace/GetWorkspaceSummaryUseCase.js'
+import type { GetDashboardUseCase } from '../../application/workspace/GetDashboardUseCase.js'
+import type { GetActivityUseCase } from '../../application/workspace/GetActivityUseCase.js'
+import type { DeleteConnectionUseCase } from '../../application/workspace/DeleteConnectionUseCase.js'
+import type { GetConnectionsUseCase } from '../../application/workspace/GetConnectionsUseCase.js'
+import type { GetKnowledgeUseCase } from '../../application/workspace/GetKnowledgeUseCase.js'
+import type { GetComplianceUseCase } from '../../application/workspace/GetComplianceUseCase.js'
+import type { OrganisationRepository } from '../../domain/organisation/repository.js'
+import type { WorkspaceRepository } from '../../domain/workspace/repository.js'
+import { parseBody } from '../middleware/validate.js'
+import type { AuthUser, AuthEnv } from '../middleware/auth.js'
+import { NotFoundError, ConflictError } from '../../domain/shared/errors.js'
+
+const log = pino({ name: 'routes/workspaces' })
+
+const createWorkspaceSchema = z.object({
+  name: z.string().min(1, 'Workspace name is required').max(255),
+  model: z.string().min(1, 'Model is required').max(100),
+  team_id: z.string().max(255).optional(),
+  team_name: z.string().max(255).optional(),
+  system_prompt: z.string().max(10000).optional(),
+  org_id: z.string().max(255).optional(),
+}).refine((data) => data.team_id || data.team_name, {
+  message: 'Select a team or enter a new team name.',
+  path: ['team_id'],
+})
+
+const updateWorkspaceSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  model: z.string().min(1).max(255).optional(),
+  system_prompt: z.string().max(10000).optional(),
+  cold_timeout_minutes: z.number().int().min(1).max(10080).nullable().optional(),
+  close_timeout_minutes: z.number().int().min(1).max(10080).nullable().optional(),
+})
+
+interface WorkspaceRouteDeps {
+  createWorkspaceUseCase: CreateWorkspaceUseCase
+  updateWorkspaceUseCase: UpdateWorkspaceUseCase
+  getWorkspaceDetailUseCase: GetWorkspaceDetailUseCase
+  listWorkspacesUseCase: ListWorkspacesUseCase
+  getWorkspaceSummaryUseCase: GetWorkspaceSummaryUseCase
+  getDashboardUseCase: GetDashboardUseCase
+  getActivityUseCase: GetActivityUseCase
+  deleteConnectionUseCase: DeleteConnectionUseCase
+  getConnectionsUseCase: GetConnectionsUseCase
+  getKnowledgeUseCase: GetKnowledgeUseCase
+  getComplianceUseCase: GetComplianceUseCase
+  orgRepo: OrganisationRepository
+  workspaceRepo: WorkspaceRepository
+  requireAuth: (c: import('hono').Context, next: import('hono').Next) => Promise<Response | void>
+}
+
+export function createWorkspaceRoutes(deps: WorkspaceRouteDeps) {
+  const workspaces = new Hono<AuthEnv>()
+
+  workspaces.use('/api/workspaces/*', deps.requireAuth)
+  workspaces.use('/api/workspaces', deps.requireAuth)
+  workspaces.use('/api/teams', deps.requireAuth)
+  workspaces.use('/api/connections/*', deps.requireAuth)
+
+  workspaces.get('/api/teams', async (c) => {
+    const user = c.get('user') as AuthUser
+    const teams = await deps.orgRepo.listTeams(user.org_id)
+    return c.json({ teams })
+  })
+
+  workspaces.post('/api/workspaces', async (c) => {
+    const result = await parseBody(c, createWorkspaceSchema)
+    if (!result.success) return result.response
+    const user = c.get('user') as AuthUser
+
+    try {
+      const ws = await deps.createWorkspaceUseCase.execute({
+        name: result.data.name,
+        model: result.data.model,
+        teamId: result.data.team_id,
+        teamName: result.data.team_name,
+        systemPrompt: result.data.system_prompt,
+        orgId: result.data.org_id || user.org_id,
+      })
+      log.info({ workspace: ws.id, name: ws.name }, 'Workspace created')
+      return c.json(ws)
+    } catch (err) {
+      if (err instanceof ConflictError) return c.json({ error: err.message }, 400)
+      throw err
+    }
+  })
+
+  workspaces.get('/api/workspaces', async (c) => {
+    const rows = await deps.listWorkspacesUseCase.execute()
+    return c.json({ workspaces: rows })
+  })
+
+  workspaces.get('/api/workspaces/:id/summary', async (c) => {
+    try {
+      const workspace = await deps.getWorkspaceSummaryUseCase.execute(c.req.param('id'))
+      return c.json({ workspace })
+    } catch (err) {
+      if (err instanceof NotFoundError) return c.json({ error: 'Workspace not found' }, 404)
+      throw err
+    }
+  })
+
+  workspaces.delete('/api/connections/:id', async (c) => {
+    await deps.deleteConnectionUseCase.execute(c.req.param('id'))
+    return c.json({ status: 'ok' })
+  })
+
+  workspaces.get('/api/workspaces/:id/connections', async (c) => {
+    const result = await deps.getConnectionsUseCase.execute(c.req.param('id'))
+    return c.json(result)
+  })
+
+  workspaces.get('/api/workspaces/:id/consumers', async (c) => {
+    const consumers = await deps.workspaceRepo.findConsumers(c.req.param('id'))
+    return c.json({ consumers })
+  })
+
+  workspaces.get('/api/workspaces/:id/knowledge', async (c) => {
+    const result = await deps.getKnowledgeUseCase.execute(c.req.param('id'))
+    return c.json(result)
+  })
+
+  workspaces.get('/api/workspaces/:id/compliance', async (c) => {
+    const result = await deps.getComplianceUseCase.execute(c.req.param('id'))
+    return c.json(result)
+  })
+
+  workspaces.get('/api/workspaces/:id', async (c) => {
+    try {
+      const detail = await deps.getWorkspaceDetailUseCase.execute(c.req.param('id'))
+      return c.json(detail)
+    } catch (err) {
+      if (err instanceof NotFoundError) return c.json({ error: 'Workspace not found' }, 404)
+      throw err
+    }
+  })
+
+  workspaces.put('/api/workspaces/:id', async (c) => {
+    const result = await parseBody(c, updateWorkspaceSchema)
+    if (!result.success) return result.response
+
+    try {
+      await deps.updateWorkspaceUseCase.execute(c.req.param('id'), result.data)
+      return c.json({ status: 'ok' })
+    } catch (err) {
+      if (err instanceof NotFoundError) return c.json({ error: 'Workspace not found' }, 404)
+      throw err
+    }
+  })
+
+  workspaces.get('/api/workspaces/:id/activity', async (c) => {
+    const limit = parseInt(c.req.query('limit') || '20')
+    const offset = parseInt(c.req.query('offset') || '0')
+    const result = await deps.getActivityUseCase.execute(c.req.param('id'), limit, offset)
+    return c.json({ activity: result.rows, total: result.total })
+  })
+
+  workspaces.get('/api/workspaces/:id/dashboard', async (c) => {
+    const result = await deps.getDashboardUseCase.execute(c.req.param('id'))
+    return c.json(result)
+  })
+
+  return workspaces
+}

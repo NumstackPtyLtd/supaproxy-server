@@ -1,0 +1,60 @@
+import { Hono } from 'hono'
+import pino from 'pino'
+import type { ListConversationsUseCase } from '../../application/conversation/ListConversationsUseCase.js'
+import type { GetConversationDetailUseCase } from '../../application/conversation/GetConversationDetailUseCase.js'
+import type { CloseConversationUseCase } from '../../application/conversation/CloseConversationUseCase.js'
+import type { AuthEnv } from '../middleware/auth.js'
+import { NotFoundError } from '../../domain/shared/errors.js'
+
+const log = pino({ name: 'routes/conversations' })
+
+interface ConversationRouteDeps {
+  listConversationsUseCase: ListConversationsUseCase
+  getConversationDetailUseCase: GetConversationDetailUseCase
+  closeConversationUseCase: CloseConversationUseCase
+  requireAuth: (c: import('hono').Context, next: import('hono').Next) => Promise<Response | void>
+}
+
+export function createConversationRoutes(deps: ConversationRouteDeps) {
+  const conversations = new Hono<AuthEnv>()
+
+  conversations.use('/api/workspaces/*/conversations*', deps.requireAuth)
+
+  conversations.get('/api/workspaces/:id/conversations', async (c) => {
+    const wsId = c.req.param('id')
+    const limit = parseInt(c.req.query('limit') || '20')
+    const offset = parseInt(c.req.query('offset') || '0')
+    const filters = {
+      status: c.req.query('status'),
+      category: c.req.query('category'),
+      resolution: c.req.query('resolution'),
+      consumer: c.req.query('consumer'),
+    }
+
+    const result = await deps.listConversationsUseCase.execute(wsId, filters, limit, offset)
+    return c.json(result)
+  })
+
+  conversations.get('/api/workspaces/:id/conversations/:cid', async (c) => {
+    try {
+      const result = await deps.getConversationDetailUseCase.execute(c.req.param('cid'))
+      return c.json(result)
+    } catch (err) {
+      if (err instanceof NotFoundError) return c.json({ error: 'Conversation not found' }, 404)
+      throw err
+    }
+  })
+
+  conversations.post('/api/workspaces/:id/conversations/:cid/close', async (c) => {
+    try {
+      await deps.closeConversationUseCase.execute(c.req.param('cid'))
+      log.info({ conversationId: c.req.param('cid') }, 'Conversation closed manually, analysis queued')
+      return c.json({ status: 'closed', message: 'Conversation closed. Analysis is running.' })
+    } catch (err) {
+      if (err instanceof NotFoundError) return c.json({ error: 'Conversation not found' }, 404)
+      throw err
+    }
+  })
+
+  return conversations
+}

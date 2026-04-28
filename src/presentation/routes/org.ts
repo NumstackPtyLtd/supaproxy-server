@@ -1,0 +1,90 @@
+import { Hono } from 'hono'
+import { z } from 'zod'
+import type { GetOrgUseCase } from '../../application/organisation/GetOrgUseCase.js'
+import type { UpdateOrgUseCase } from '../../application/organisation/UpdateOrgUseCase.js'
+import type { GetOrgSettingsUseCase } from '../../application/organisation/GetOrgSettingsUseCase.js'
+import type { UpdateOrgSettingUseCase } from '../../application/organisation/UpdateOrgSettingUseCase.js'
+import type { TestIntegrationUseCase } from '../../application/organisation/TestIntegrationUseCase.js'
+import type { ListOrgUsersUseCase } from '../../application/organisation/ListOrgUsersUseCase.js'
+import type { OrganisationRepository } from '../../domain/organisation/repository.js'
+import { parseBody } from '../middleware/validate.js'
+import type { AuthUser, AuthEnv } from '../middleware/auth.js'
+import { NotFoundError, ValidationError } from '../../domain/shared/errors.js'
+
+const updateOrgSchema = z.object({ name: z.string().min(1, 'Organisation name is required').max(255) })
+const updateSettingSchema = z.object({ value: z.string().max(5000) })
+const integrationTestSchema = z.object({ type: z.string().min(1, 'Integration type is required'), credentials: z.record(z.string().max(500)) })
+
+interface OrgRouteDeps {
+  getOrgUseCase: GetOrgUseCase
+  updateOrgUseCase: UpdateOrgUseCase
+  getOrgSettingsUseCase: GetOrgSettingsUseCase
+  updateOrgSettingUseCase: UpdateOrgSettingUseCase
+  testIntegrationUseCase: TestIntegrationUseCase
+  listOrgUsersUseCase: ListOrgUsersUseCase
+  orgRepo: OrganisationRepository
+  requireAuth: (c: import('hono').Context, next: import('hono').Next) => Promise<Response | void>
+}
+
+export function createOrgRoutes(deps: OrgRouteDeps) {
+  const org = new Hono<AuthEnv>()
+
+  org.use('/api/org/*', deps.requireAuth)
+  org.use('/api/org', deps.requireAuth)
+
+  org.get('/api/org', async (c) => {
+    const user = c.get('user') as AuthUser
+    try {
+      const orgData = await deps.getOrgUseCase.execute(user.org_id)
+      return c.json({ org: orgData })
+    } catch (err) {
+      if (err instanceof NotFoundError) return c.json({ error: 'Organisation not found' }, 404)
+      throw err
+    }
+  })
+
+  org.put('/api/org', async (c) => {
+    const user = c.get('user') as AuthUser
+    const result = await parseBody(c, updateOrgSchema)
+    if (!result.success) return result.response
+    await deps.updateOrgUseCase.execute(user.org_id, result.data.name)
+    return c.json({ status: 'ok' })
+  })
+
+  org.get('/api/org/settings', async (c) => {
+    const user = c.get('user') as AuthUser
+    const settings = await deps.getOrgSettingsUseCase.execute(user.org_id)
+    return c.json(settings)
+  })
+
+  org.put('/api/org/settings/:key', async (c) => {
+    const user = c.get('user') as AuthUser
+    const key = c.req.param('key')
+    const result = await parseBody(c, updateSettingSchema)
+    if (!result.success) return result.response
+    await deps.updateOrgSettingUseCase.execute(user.org_id, key, result.data.value)
+    return c.json({ status: 'ok' })
+  })
+
+  org.post('/api/org/integrations/test', async (c) => {
+    const result = await parseBody(c, integrationTestSchema)
+    if (!result.success) return result.response
+
+    try {
+      const testResult = await deps.testIntegrationUseCase.execute(result.data.type, result.data.credentials)
+      if (!testResult.ok) return c.json({ error: testResult.error }, 400)
+      return c.json(testResult.detail || { status: 'ok' })
+    } catch (err) {
+      if (err instanceof ValidationError) return c.json({ error: err.message }, 400)
+      return c.json({ error: `Could not reach ${result.data.type} service` }, 400)
+    }
+  })
+
+  org.get('/api/org/users', async (c) => {
+    const user = c.get('user') as AuthUser
+    const users = await deps.listOrgUsersUseCase.execute(user.org_id)
+    return c.json({ users })
+  })
+
+  return org
+}
