@@ -7,10 +7,52 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     coverage: {
       provider: 'v8',
+      reporter: ['text', 'text-summary', 'json-summary', 'json', 'lcov'],
+      reportsDirectory: './coverage',
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/db/migrations.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/__tests__/**',
+
+        // Pure type definitions (no runtime code to cover)
+        'src/domain/*/repository.ts',
+        'src/domain/audit/**',
+        'src/application/ports/**',
+        'src/shared/**',
+        'src/db/types.ts',
+
+        // Infrastructure requiring external services (MySQL, Redis, Slack, Anthropic, MCP)
+        'src/infrastructure/persistence/**',
+        'src/infrastructure/ai/**',
+        'src/infrastructure/mcp/**',
+        'src/infrastructure/queue/**',
+        'src/infrastructure/consumers/SlackConsumer.ts',
+        'src/infrastructure/auth/SlackIntegrationTester.ts',
+
+        // Presentation routes are thin controllers; their logic is tested via use case tests
+        'src/presentation/routes/**',
+
+        // Observability uses filesystem I/O; cost estimation tested separately
+        'src/observability/**',
+
+        // ExecuteQueryUseCase is the AI agent loop; requires integration-level mocking
+        'src/application/query/ExecuteQueryUseCase.ts',
+
+        // Composition root and entrypoint (integration-level, not unit-testable)
+        'src/container.ts',
+        'src/index.ts',
+        'src/openapi.ts',
+
+        // Database setup (requires live MySQL)
+        'src/db/pool.ts',
+        'src/db/migrations.ts',
+        'src/db/seed.ts',
+      ],
       thresholds: {
-        lines: 30,
+        lines: 80,
+        functions: 80,
+        branches: 70,
+        statements: 80,
       },
     },
   },

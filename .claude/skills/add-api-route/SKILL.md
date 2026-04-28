@@ -1,107 +1,199 @@
 ---
 name: add-api-route
 description: >
-  Adds a new API endpoint to the Hono backend. Handles auth middleware,
-  Zod input validation, database queries, and response formatting.
+  Scaffolds a new API endpoint following DDD architecture. Creates repository
+  interface method, MySQL implementation, application use case, and thin
+  presentation route handler. Wires everything through the container.
 ---
 
-# Add API Route
+# Add API Route (DDD)
 
-## Step 1: Determine which route module it belongs to
+Every new endpoint touches exactly four layers. Never skip a layer.
 
-Routes are split into modules in `src/routes/`:
+## Step 1: Determine the domain aggregate
 
-| Module | Prefix | Purpose |
+Which aggregate does this endpoint belong to?
+
+| Aggregate | Repository interface | MySQL implementation |
 |---|---|---|
-| `auth.ts` | `/api/auth/*`, `/api/signup` | Login, logout, session, signup |
-| `org.ts` | `/api/org/*` | Org CRUD, settings, users |
-| `queues.ts` | `/api/org/queues/*` | Queue management |
-| `workspaces.ts` | `/api/workspaces/*`, `/api/teams` | Workspace CRUD, dashboard, activity |
-| `conversations.ts` | `/api/workspaces/:id/conversations/*` | Conversation list, detail, close |
-| `connectors.ts` | `/api/connectors/*` | MCP, Slack connectors |
-| `query.ts` | `/api/workspaces/:id/query` | Agent loop |
+| Organisation | `domain/organisation/repository.ts` | `infrastructure/persistence/mysql/MysqlOrganisationRepository.ts` |
+| Workspace | `domain/workspace/repository.ts` | `infrastructure/persistence/mysql/MysqlWorkspaceRepository.ts` |
+| Conversation | `domain/conversation/repository.ts` | `infrastructure/persistence/mysql/MysqlConversationRepository.ts` |
+| Audit | `domain/audit/repository.ts` | `infrastructure/persistence/mysql/MysqlAuditLogRepository.ts` |
 
-If the endpoint does not fit an existing module, create a new route file and mount it in `index.ts`.
+If none fit, consider whether this needs a new aggregate.
 
-## Step 2: Add the route
+## Step 2: Add repository interface method (Domain layer)
 
-Use the auth middleware and Zod validation -- do not manually verify JWTs or parse bodies:
+Add the method signature to the repository interface in `src/domain/{aggregate}/repository.ts`:
 
 ```typescript
-import { Hono } from 'hono'
-import { z } from 'zod'
-import { requireAuth, type AuthUser, type AuthEnv } from '../middleware/auth.js'
-import { parseBody } from '../middleware/validate.js'
-import { getPool } from '../db/pool.js'
-import type { RowDataPacket } from 'mysql2'
-
-// Define typed row interfaces for DB results
-interface YourRow extends RowDataPacket {
-  id: string
-  name: string
-  org_id: string
+// In the repository interface - pure contract, no implementation details
+export interface WorkspaceRepository {
+  // ... existing methods ...
+  findWidgetsByWorkspace(workspaceId: string): Promise<WidgetData[]>
 }
 
-const router = new Hono<AuthEnv>()
-
-// Apply auth to all routes in this group
-router.use('/api/your-resource/*', requireAuth)
-
-router.get('/api/your-resource', async (c) => {
-  const user = c.get('user') as AuthUser
-  const db = getPool()
-
-  const [rows] = await db.execute<YourRow[]>(
-    'SELECT * FROM table WHERE org_id = ?',
-    [user.org_id]
-  )
-  return c.json({ data: rows })
-})
-
-// Define Zod schema for input validation
-const CreateSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  description: z.string().optional(),
-})
-
-router.post('/api/your-resource', async (c) => {
-  const user = c.get('user') as AuthUser
-  const result = await parseBody(c, CreateSchema)
-  if (!result.success) return result.response
-
-  const { name, description } = result.data
-  const db = getPool()
-
-  // Execute action
-  // Return result
-  return c.json({ status: 'ok' })
-})
-
-export default router
+// Define the return type next to the interface
+export interface WidgetData {
+  id: string
+  name: string
+  workspace_id: string
+}
 ```
 
-## Step 3: Mount in index.ts (if new module)
+Rules:
+- **No SQL, no mysql2 types, no RowDataPacket** in domain interfaces.
+- Return plain data interfaces, not DB row types.
+- Method names describe the query intent, not the SQL.
+
+## Step 3: Implement in MySQL repository (Infrastructure layer)
+
+Add the implementation in `src/infrastructure/persistence/mysql/Mysql{Aggregate}Repository.ts`:
 
 ```typescript
-import newRouter from './routes/new-module.js'
-app.route('/', newRouter)
+import type { RowDataPacket } from 'mysql2'
+
+interface WidgetRow extends RowDataPacket {
+  id: string
+  name: string
+  workspace_id: string
+}
+
+// Inside the class:
+async findWidgetsByWorkspace(workspaceId: string): Promise<WidgetData[]> {
+  const [rows] = await this.pool.execute<WidgetRow[]>(
+    'SELECT id, name, workspace_id FROM widgets WHERE workspace_id = ?',
+    [workspaceId]
+  )
+  return rows
+}
 ```
 
-## Step 4: Rules
+Rules:
+- **All SQL lives here and ONLY here.**
+- RowDataPacket types are private to this file.
+- Use parameterised queries with `?` placeholders.
 
-- **Use `requireAuth` middleware** -- never manually parse JWT cookies in route handlers
-- **Use `AuthEnv` type parameter** on Hono instance so `c.get('user')` is typed
-- **Use `parseBody(c, schema)`** for input validation with Zod schemas
-- **Type all DB rows** -- interfaces extending `RowDataPacket` in `db/types.ts` or locally
-- **Database**: use `getPool()` from `./db/pool.js`
-- **No business logic in route handlers**: extract to `core/` service modules if complex
-- **No hardcoded URLs or secrets**: use `config.ts` exports
-- **Error responses**: return `c.json({ error: 'message' }, statusCode)` -- never leak internals
+## Step 4: Create use case (Application layer)
 
-## Step 5: Restart and verify
+Create `src/application/{domain}/{VerbNounUseCase}.ts`:
 
-Run `/restart-servers` for the Hono backend. Verify the new endpoint returns the expected response:
+```typescript
+import type { WorkspaceRepository } from '../../domain/workspace/repository.js'
+import { NotFoundError } from '../../domain/shared/errors.js'
+
+export class GetWidgetsUseCase {
+  constructor(private readonly workspaceRepo: WorkspaceRepository) {}
+
+  async execute(workspaceId: string) {
+    const exists = await this.workspaceRepo.existsById(workspaceId)
+    if (!exists) throw new NotFoundError('Workspace', workspaceId)
+    return this.workspaceRepo.findWidgetsByWorkspace(workspaceId)
+  }
+}
+```
+
+Rules:
+- **Constructor takes interfaces, not concrete classes.**
+- **Single `execute()` method.**
+- **Throw domain errors** (`NotFoundError`, `ConflictError`, `ValidationError`).
+- **NEVER import from `infrastructure/`.**
+
+## Step 4b: Write the use case test FIRST (TDD - MANDATORY)
+
+Before implementing the use case, write the test:
+
+```typescript
+// src/application/workspace/GetWidgetsUseCase.test.ts
+import { describe, it, expect, vi } from 'vitest'
+import { mockWorkspaceRepo, stubWorkspace } from '../../__tests__/mocks.js'
+import { NotFoundError } from '../../domain/shared/errors.js'
+import { GetWidgetsUseCase } from './GetWidgetsUseCase.js'
+
+describe('GetWidgetsUseCase', () => {
+  it('returns widgets for an existing workspace', async () => {
+    const wsRepo = mockWorkspaceRepo()
+    vi.mocked(wsRepo.existsById).mockResolvedValue(true)
+    vi.mocked(wsRepo.findWidgetsByWorkspace).mockResolvedValue([{ id: 'w1', name: 'Widget 1', workspace_id: 'ws-test' }])
+    const useCase = new GetWidgetsUseCase(wsRepo)
+
+    const result = await useCase.execute('ws-test')
+
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe('Widget 1')
+  })
+
+  it('throws NotFoundError if workspace does not exist', async () => {
+    const wsRepo = mockWorkspaceRepo()
+    const useCase = new GetWidgetsUseCase(wsRepo)
+
+    await expect(useCase.execute('ws-missing')).rejects.toThrow(NotFoundError)
+  })
+})
+```
+
+Run the test to confirm it fails (RED), then implement the use case (GREEN):
+```bash
+npx vitest run src/application/workspace/GetWidgetsUseCase.test.ts
+```
+
+## Step 5: Add route handler (Presentation layer)
+
+Add to the relevant route factory in `src/presentation/routes/{module}.ts`:
+
+```typescript
+// In the deps interface:
+interface WidgetRouteDeps {
+  getWidgetsUseCase: GetWidgetsUseCase
+  requireAuth: (c: Context, next: Next) => Promise<Response | void>
+}
+
+// In the route factory:
+router.get('/api/workspaces/:id/widgets', async (c) => {
+  try {
+    const widgets = await deps.getWidgetsUseCase.execute(c.req.param('id'))
+    return c.json({ widgets })
+  } catch (err) {
+    if (err instanceof NotFoundError) return c.json({ error: err.message }, 404)
+    throw err
+  }
+})
+```
+
+Rules:
+- **Route handlers do three things:** parse request, call use case, format response.
+- **No SQL, no business logic, no direct DB access.**
+- **Catch domain errors and map to HTTP status codes.**
+
+## Step 6: Wire in container.ts
+
+```typescript
+// 1. Import the use case
+import { GetWidgetsUseCase } from './application/workspace/GetWidgetsUseCase.js'
+
+// 2. Instantiate with repository interface
+const getWidgetsUseCase = new GetWidgetsUseCase(workspaceRepo)
+
+// 3. Pass to route factory
+const workspaceRoutes = createWorkspaceRoutes({ ..., getWidgetsUseCase })
+
+// 4. Export from container
+return { ..., getWidgetsUseCase }
+```
+
+## Step 7: Verify
 
 ```bash
-curl -s http://localhost:3001/api/your-resource | python3 -m json.tool
+npx tsc --noEmit                    # Must compile clean
+pnpm test                            # Must pass
+curl -s http://localhost:3001/api/workspaces/ws-test/widgets | python3 -m json.tool
 ```
+
+## Anti-patterns (NEVER do these)
+
+- Calling `getPool()` in a route handler or use case
+- Putting SQL in a use case
+- Importing from `infrastructure/` in a use case
+- Putting business logic in a route handler
+- Skipping the use case layer ("it's just a simple query")

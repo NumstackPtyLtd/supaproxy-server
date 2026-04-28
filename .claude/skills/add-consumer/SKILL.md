@@ -1,158 +1,115 @@
 ---
 name: add-consumer
 description: >
-  Adds a new consumer type to SupaProxy. Consumers connect external message
-  sources (Slack, WhatsApp, Discord, webhooks) to the agent loop. Covers
-  file placement, interface patterns, workspace binding, and server boot
-  integration.
+  Adds a new consumer type to SupaProxy following DDD architecture. Consumers
+  connect external message sources to the agent loop via the container's use
+  cases. No direct DB access or core module imports.
 ---
 
-# Add Consumer
+# Add Consumer (DDD)
 
-A consumer connects an external message source to the SupaProxy agent loop. The existing Slack consumer (`src/consumers/slack.ts`) is the reference implementation.
+A consumer connects an external message source (Slack, WhatsApp, Discord) to the SupaProxy agent loop. The Slack consumer (`infrastructure/consumers/SlackConsumer.ts`) is the reference implementation.
 
 ## Step 1: Create the consumer file
 
-Create `src/consumers/<name>.ts`.
+Create `src/infrastructure/consumers/{Name}Consumer.ts`.
 
-Follow this structure:
+The consumer receives the container as a dependency and uses use cases for all operations:
 
 ```typescript
-import pino from 'pino';
-import { getPool } from '../db/pool.js';
-import { runAgent } from '../core/agent.ts';
-import { findOrCreateConversation, getConversationHistory } from '../core/conversation.js';
-import type { RowDataPacket } from 'mysql2';
+import pino from 'pino'
+import type { Container } from '../../container.js'
 
-const log = pino({ name: '<name>-consumer' });
+const log = pino({ name: '<name>-consumer' })
 
-// Define typed row interfaces for DB queries
-interface WorkspaceConsumerRow extends RowDataPacket {
-  workspace_id: string;
-  config: string;
-  model: string;
-  system_prompt: string | null;
-  max_tool_rounds: number;
+let activeClient: ClientType | null = null
+
+async function handleQuery(
+  query: string,
+  workspaceId: string,
+  meta: { channel: string; userId: string; userName: string; sessionId: string },
+  container: Container,
+) {
+  const result = await container.executeQueryUseCase.execute(workspaceId, query, {
+    consumerType: '<name>',
+    channel: meta.channel,
+    userId: meta.userId,
+    userName: meta.userName,
+    sessionId: meta.sessionId,
+  })
+  return result.answer
 }
 
-// Workspace lookup: map the external channel/endpoint to a SupaProxy workspace
-async function getWorkspaceForChannel(channelId: string) {
-  const db = getPool();
-  const [rows] = await db.execute<WorkspaceConsumerRow[]>(
-    `SELECT c.workspace_id, c.config, w.model, w.system_prompt, w.max_tool_rounds
-     FROM consumers c
-     JOIN workspaces w ON c.workspace_id = w.id
-     WHERE c.type = ? AND w.status = 'active'`,
-    ['<name>']
-  );
-  // Parse config JSON and match channelId to workspace
-  // Return the matching workspace or null
+export async function start{Name}Consumer(token: string, container: Container) {
+  // 1. Initialise the external client
+  // 2. Register message handlers that call handleQuery
+  // 3. Register with container.posterRegistry for lifecycle messages
+  container.posterRegistry.register('<name>', async (target, text) => {
+    // Post lifecycle messages (cold, close) back to the external service
+  })
+
+  log.info('<Name> consumer started')
 }
 
-// Message handler: receive message, run agent, post response
-async function handleMessage(channelId: string, userId: string, text: string) {
-  const workspace = await getWorkspaceForChannel(channelId);
-  if (!workspace) {
-    log.warn({ channelId }, 'No workspace found for channel');
-    return;
+export async function stop{Name}Consumer() {
+  if (activeClient) {
+    activeClient = null
   }
-
-  // Find or create a conversation for this channel/thread
-  const conversation = await findOrCreateConversation(
-    workspace.workspace_id,
-    channelId,  // external_id
-    '<name>'    // source type
-  );
-
-  // Get conversation history for context
-  const history = await getConversationHistory(conversation.id);
-
-  // Run the agent
-  const result = await runAgent({
-    query: text,
-    workspaceId: workspace.workspace_id,
-    conversationId: conversation.id,
-    model: workspace.model,
-    systemPrompt: workspace.system_prompt,
-    maxToolRounds: workspace.max_tool_rounds,
-    history,
-  });
-
-  // Post the response back through the external service
-  // ... consumer-specific response logic
-}
-
-// Export the start function (called from index.ts at boot)
-export async function startConsumer(/* tokens/config */) {
-  // Initialize the external client/connection
-  // Register event handlers that call handleMessage
-  // Log successful startup
-  log.info('<Name> consumer started');
 }
 ```
 
-## Step 2: Key patterns from the Slack reference
+## Step 2: Key DDD rules
 
-The Slack consumer (`consumers/slack.ts`) demonstrates:
+1. **Use container for all operations.** Never call `getPool()` or import from `domain/` directly.
+2. **Use `container.executeQueryUseCase`** for running queries through the agent loop.
+3. **Use `container.workspaceRepo`** for workspace lookups (e.g. finding workspace by channel).
+4. **Use `container.conversationRepo`** for conversation thread tracking.
+5. **Register with `container.posterRegistry`** so the lifecycle loop can send cold/close messages.
+6. **No business logic.** The consumer maps external events to use case calls.
 
-1. **Typed DB rows** -- every `pool.execute<T>()` uses an interface extending `RowDataPacket`
-2. **Workspace lookup** -- maps Slack channel ID to a workspace via the `consumers` table
-3. **Conversation tracking** -- uses `findOrCreateConversation()` to maintain context
-4. **Agent integration** -- calls `runAgent()` from `core/agent.ts`
-5. **Error handling** -- wraps message handling in try/catch, logs errors with pino
-6. **Bot self-detection** -- ignores messages from the bot itself to prevent loops
+## Step 3: Add consumer type handler
 
-## Step 3: Register in the database
+If the consumer needs to be connected via the dashboard, add a handler to `container.ts`:
 
-The consumer needs a row in the `consumers` table:
-
-```sql
-INSERT INTO consumers (id, type, workspace_id, config, status)
-VALUES (UUID(), '<name>', '<workspace_id>', '{"channel_id": "..."}', 'active');
+```typescript
+const consumerTypeHandlers = {
+  '<name>': {
+    buildConfig(credentials: Record<string, string>, channelId?: string) {
+      return JSON.stringify({ token: credentials.token, channels: channelId ? [channelId] : [] })
+    },
+    async verifyCredentials(credentials: Record<string, string>) {
+      // Validate credentials with external API
+    },
+    async start(credentials: Record<string, string>) {
+      const { start{Name}Consumer } = await import('./infrastructure/consumers/{Name}Consumer.js')
+      await start{Name}Consumer(credentials.token, container)
+    },
+  },
+}
 ```
-
-The `config` column stores consumer-specific JSON (channel IDs, webhook URLs, etc.).
 
 ## Step 4: Wire up in index.ts
 
-Add the consumer startup to `index.ts` inside the `serve()` callback, following the Slack pattern:
-
 ```typescript
-// Start <name> consumer
 try {
-  const [tokenRows] = await pool.execute<ValueRow[]>(
-    "SELECT value FROM org_settings WHERE key_name = '<name>_token' LIMIT 1"
-  )
-  const token = tokenRows[0]?.value
+  const token = await container.orgRepo.getSettingValue('<name>_token')
   if (token) {
-    const { startConsumer } = await import('./consumers/<name>.js')
-    await startConsumer(token)
+    const { start{Name}Consumer } = await import('./infrastructure/consumers/{Name}Consumer.js')
+    await start{Name}Consumer(token, container)
   } else {
-    log.info('<Name> consumer not configured - set token in org settings')
+    log.info('<Name> consumer not configured')
   }
 } catch (err) {
-  log.warn({ error: (err as Error).message }, '<Name> consumer failed - server continues without it')
+  log.warn({ error: (err as Error).message }, '<Name> consumer failed - server continues')
 }
 ```
 
-Key rules:
-- **Dynamic import** -- use `await import()` so the consumer module is only loaded if configured
-- **Graceful failure** -- consumer startup failure must NOT crash the server
-- **Log clearly** -- log whether the consumer started, was not configured, or failed
-
 ## Step 5: Rules
 
-- **No hardcoded tokens** -- read from `org_settings` table or environment via `requireEnv()`
-- **No provider names in logs** -- say "AI provider", not brand names
-- **Type all DB rows** -- no `as any` on query results
-- **Log with pino** -- not `console.log`
-- **Consumers start at boot only** -- document that token changes require a server restart
-- **Consumer failure is non-fatal** -- the server must continue running if a consumer fails to start
-
-## Step 6: Restart and verify
-
-Run `/restart-servers` and check logs:
-
-```bash
-strings /tmp/supaproxy-server.log | grep -i "<name>\|consumer\|started\|failed"
-```
+- **Container injection, not direct imports.** The consumer receives the container, not individual services.
+- **No `getPool()` calls.** All DB access through container repositories.
+- **No `import ... from '../core/'`.** The old core layer does not exist.
+- **Consumer failure is non-fatal.** The server continues if a consumer fails to start.
+- **Log with pino.** Not `console.log`.
+- **No provider names in logs.**
+- **No hardcoded tokens.** Read from `org_settings` via `container.orgRepo.getSettingValue()`.
