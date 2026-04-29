@@ -4,6 +4,9 @@
   "private": true,
   "license": "MIT",
   "type": "module",
+  "exports": {
+    "./server": "./src/server.ts"
+  },
   "description": "AI operations engine. Route any LLM to any team through one governed layer.",
   "scripts": {
     "dev": "tsx watch src/index.ts",
