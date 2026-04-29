@@ -150,7 +150,7 @@ export class ExecuteQueryUseCase {
 
   private async resolveProvider(): Promise<{ provider: ProviderPlugin; apiKey: string }> {
     const settings = await this.orgRepo.getSettingValues(['ai_provider_type', 'ai_api_key', 'anthropic_api_key'])
-    const providerType = settings['ai_provider_type'] || 'anthropic'
+    const providerType = settings['ai_provider_type'] || (() => { throw new Error('No AI provider configured. Set ai_provider_type in Settings > Integrations.') })()
     const apiKey = settings['ai_api_key'] || settings['anthropic_api_key'] || null
     if (!apiKey) throw new ConfigurationError('No AI API key configured. Set it in Settings > Integrations.')
     const provider = this.providerRegistry.get(providerType)
