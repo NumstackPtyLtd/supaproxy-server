@@ -14,8 +14,9 @@ import type { GetKnowledgeUseCase } from '../../application/workspace/GetKnowled
 import type { GetComplianceUseCase } from '../../application/workspace/GetComplianceUseCase.js'
 import type { OrganisationRepository } from '../../domain/organisation/repository.js'
 import type { WorkspaceRepository } from '../../domain/workspace/repository.js'
+import type { TenantService } from '../../application/ports/TenantService.js'
 import { parseBody } from '../middleware/validate.js'
-import type { AuthUser, AuthEnv } from '../middleware/auth.js'
+import { type AuthUser, type AuthEnv } from '../middleware/auth.js'
 import { NotFoundError, ConflictError } from '../../domain/shared/errors.js'
 
 const log = pino({ name: 'routes/workspaces' })
@@ -54,6 +55,7 @@ interface WorkspaceRouteDeps {
   getComplianceUseCase: GetComplianceUseCase
   orgRepo: OrganisationRepository
   workspaceRepo: WorkspaceRepository
+  tenantService: TenantService
   requireAuth: (c: import('hono').Context, next: import('hono').Next) => Promise<Response | void>
 }
 
@@ -83,7 +85,7 @@ export function createWorkspaceRoutes(deps: WorkspaceRouteDeps) {
         teamId: result.data.team_id,
         teamName: result.data.team_name,
         systemPrompt: result.data.system_prompt,
-        orgId: result.data.org_id || user.org_id,
+        orgId: user.org_id,
       })
       log.info({ workspace: ws.id, name: ws.name }, 'Workspace created')
       return c.json(ws)
@@ -93,13 +95,23 @@ export function createWorkspaceRoutes(deps: WorkspaceRouteDeps) {
     }
   })
 
+  // Helper: verify workspace belongs to user's org (delegates to tenant service)
+  async function guardWorkspace(workspaceId: string, userOrgId: string) {
+    const ws = await deps.workspaceRepo.findById(workspaceId)
+    deps.tenantService.verifyWorkspaceAccess(ws?.org_id ?? null, userOrgId)
+  }
+
   workspaces.get('/api/workspaces', async (c) => {
-    const rows = await deps.listWorkspacesUseCase.execute()
+    const user = c.get('user') as AuthUser
+    const orgScope = deps.tenantService.scopeWorkspaceList(user.org_id)
+    const rows = await deps.listWorkspacesUseCase.execute(orgScope)
     return c.json({ workspaces: rows })
   })
 
   workspaces.get('/api/workspaces/:id/summary', async (c) => {
+    const user = c.get('user') as AuthUser
     try {
+      await guardWorkspace(c.req.param('id'), user.org_id)
       const workspace = await deps.getWorkspaceSummaryUseCase.execute(c.req.param('id'))
       return c.json({ workspace })
     } catch (err) {
@@ -114,27 +126,37 @@ export function createWorkspaceRoutes(deps: WorkspaceRouteDeps) {
   })
 
   workspaces.get('/api/workspaces/:id/connections', async (c) => {
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(c.req.param('id'), user.org_id)
     const result = await deps.getConnectionsUseCase.execute(c.req.param('id'))
     return c.json(result)
   })
 
   workspaces.get('/api/workspaces/:id/consumers', async (c) => {
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(c.req.param('id'), user.org_id)
     const consumers = await deps.workspaceRepo.findConsumers(c.req.param('id'))
     return c.json({ consumers })
   })
 
   workspaces.get('/api/workspaces/:id/knowledge', async (c) => {
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(c.req.param('id'), user.org_id)
     const result = await deps.getKnowledgeUseCase.execute(c.req.param('id'))
     return c.json(result)
   })
 
   workspaces.get('/api/workspaces/:id/compliance', async (c) => {
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(c.req.param('id'), user.org_id)
     const result = await deps.getComplianceUseCase.execute(c.req.param('id'))
     return c.json(result)
   })
 
   workspaces.get('/api/workspaces/:id', async (c) => {
+    const user = c.get('user') as AuthUser
     try {
+      await guardWorkspace(c.req.param('id'), user.org_id)
       const detail = await deps.getWorkspaceDetailUseCase.execute(c.req.param('id'))
       return c.json(detail)
     } catch (err) {
@@ -146,8 +168,10 @@ export function createWorkspaceRoutes(deps: WorkspaceRouteDeps) {
   workspaces.put('/api/workspaces/:id', async (c) => {
     const result = await parseBody(c, updateWorkspaceSchema)
     if (!result.success) return result.response
+    const user = c.get('user') as AuthUser
 
     try {
+      await guardWorkspace(c.req.param('id'), user.org_id)
       await deps.updateWorkspaceUseCase.execute(c.req.param('id'), result.data)
       return c.json({ status: 'ok' })
     } catch (err) {
@@ -157,6 +181,8 @@ export function createWorkspaceRoutes(deps: WorkspaceRouteDeps) {
   })
 
   workspaces.get('/api/workspaces/:id/activity', async (c) => {
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(c.req.param('id'), user.org_id)
     const limit = parseInt(c.req.query('limit') || '20')
     const offset = parseInt(c.req.query('offset') || '0')
     const result = await deps.getActivityUseCase.execute(c.req.param('id'), limit, offset)
@@ -164,6 +190,8 @@ export function createWorkspaceRoutes(deps: WorkspaceRouteDeps) {
   })
 
   workspaces.get('/api/workspaces/:id/dashboard', async (c) => {
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(c.req.param('id'), user.org_id)
     const result = await deps.getDashboardUseCase.execute(c.req.param('id'))
     return c.json(result)
   })

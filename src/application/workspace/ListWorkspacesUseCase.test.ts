@@ -21,9 +21,22 @@ describe('ListWorkspacesUseCase', () => {
     const workspaces = [stubWorkspaceListItem({ id: 'ws-1' }), stubWorkspaceListItem({ id: 'ws-2' })]
     vi.mocked(wsRepo.listNonArchived).mockResolvedValue(workspaces)
 
-    const result = await uc.execute()
+    const result = await uc.execute('org-1')
 
-    expect(wsRepo.listNonArchived).toHaveBeenCalledOnce()
+    expect(wsRepo.listNonArchived).toHaveBeenCalledWith('org-1')
+    expect(result).toEqual(workspaces)
+  })
+
+  it('passes null orgId for open-source (single-tenant) mode', async () => {
+    const wsRepo = mockWorkspaceRepo()
+    const uc = new ListWorkspacesUseCase(wsRepo)
+
+    const workspaces = [stubWorkspaceListItem({ id: 'ws-1' })]
+    vi.mocked(wsRepo.listNonArchived).mockResolvedValue(workspaces)
+
+    const result = await uc.execute(null)
+
+    expect(wsRepo.listNonArchived).toHaveBeenCalledWith(null)
     expect(result).toEqual(workspaces)
   })
 })

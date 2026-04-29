@@ -2,7 +2,9 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { ExecuteQueryUseCase } from '../../application/query/ExecuteQueryUseCase.js'
 import { parseBody } from '../middleware/validate.js'
-import type { AuthUser, AuthEnv } from '../middleware/auth.js'
+import { type AuthUser, type AuthEnv } from '../middleware/auth.js'
+import type { WorkspaceRepository } from '../../domain/workspace/repository.js'
+import type { TenantService } from '../../application/ports/TenantService.js'
 import { NotFoundError } from '../../domain/shared/errors.js'
 
 const queryBodySchema = z.object({
@@ -16,10 +18,17 @@ const queryBodySchema = z.object({
 
 interface QueryRouteDeps {
   executeQueryUseCase: ExecuteQueryUseCase
+  workspaceRepo: WorkspaceRepository
+  tenantService: TenantService
   requireAuth: (c: import('hono').Context, next: import('hono').Next) => Promise<Response | void>
 }
 
 export function createQueryRoutes(deps: QueryRouteDeps) {
+  async function guardWorkspace(workspaceId: string, userOrgId: string) {
+    const ws = await deps.workspaceRepo.findById(workspaceId)
+    deps.tenantService.verifyWorkspaceAccess(ws?.org_id ?? null, userOrgId)
+  }
+
   const query = new Hono<AuthEnv>()
 
   query.use('/api/workspaces/*/query', deps.requireAuth)
@@ -30,6 +39,7 @@ export function createQueryRoutes(deps: QueryRouteDeps) {
 
     const user = c.get('user') as AuthUser
     const wsId = c.req.param('id')
+    await guardWorkspace(wsId, user.org_id)
 
     try {
       const result = await deps.executeQueryUseCase.execute(wsId, parsed.data.query, {

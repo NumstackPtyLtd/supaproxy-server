@@ -6,7 +6,9 @@ import type { SaveMcpConnectionUseCase } from '../../application/connector/SaveM
 import type { BindConsumerChannelUseCase } from '../../application/connector/BindConsumerChannelUseCase.js'
 import type { ConnectConsumerUseCase } from '../../application/connector/ConnectConsumerUseCase.js'
 import { parseBody } from '../middleware/validate.js'
-import type { AuthEnv } from '../middleware/auth.js'
+import { type AuthUser, type AuthEnv } from '../middleware/auth.js'
+import type { WorkspaceRepository } from '../../domain/workspace/repository.js'
+import type { TenantService } from '../../application/ports/TenantService.js'
 import { NotFoundError, ConflictError, ValidationError } from '../../domain/shared/errors.js'
 
 const log = pino({ name: 'routes/connectors' })
@@ -23,6 +25,8 @@ interface ConnectorRouteDeps {
   saveMcpConnectionUseCase: SaveMcpConnectionUseCase
   bindConsumerChannelUseCase: BindConsumerChannelUseCase
   connectConsumerUseCase: ConnectConsumerUseCase
+  workspaceRepo: WorkspaceRepository
+  tenantService: TenantService
   requireAuth: (c: import('hono').Context, next: import('hono').Next) => Promise<Response | void>
 }
 
@@ -34,6 +38,11 @@ function handleDomainError(c: import('hono').Context, err: unknown) {
 }
 
 export function createConnectorRoutes(deps: ConnectorRouteDeps) {
+  async function guardWorkspace(workspaceId: string, userOrgId: string) {
+    const ws = await deps.workspaceRepo.findById(workspaceId)
+    deps.tenantService.verifyWorkspaceAccess(ws?.org_id ?? null, userOrgId)
+  }
+
   const connectors = new Hono<AuthEnv>()
 
   connectors.use('/api/connectors/*', deps.requireAuth)
@@ -41,6 +50,8 @@ export function createConnectorRoutes(deps: ConnectorRouteDeps) {
   connectors.post('/api/connectors/consumer/channel', async (c) => {
     const result = await parseBody(c, consumerChannelSchema)
     if (!result.success) return result.response
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(result.data.workspace_id, user.org_id)
     try {
       const output = await deps.bindConsumerChannelUseCase.execute({
         type: result.data.type,
@@ -55,6 +66,8 @@ export function createConnectorRoutes(deps: ConnectorRouteDeps) {
   connectors.post('/api/connectors/consumer', async (c) => {
     const result = await parseBody(c, consumerConnectSchema)
     if (!result.success) return result.response
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(result.data.workspace_id, user.org_id)
     try {
       const output = await deps.connectConsumerUseCase.execute({
         type: result.data.type,
@@ -73,6 +86,8 @@ export function createConnectorRoutes(deps: ConnectorRouteDeps) {
   connectors.post('/api/connectors/slack-channel', async (c) => {
     const result = await parseBody(c, slackChannelSchema)
     if (!result.success) return result.response
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(result.data.workspace_id, user.org_id)
     try {
       const output = await deps.bindConsumerChannelUseCase.execute({
         type: 'slack',
@@ -87,6 +102,8 @@ export function createConnectorRoutes(deps: ConnectorRouteDeps) {
   connectors.post('/api/connectors/slack', async (c) => {
     const result = await parseBody(c, slackConnectSchema)
     if (!result.success) return result.response
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(result.data.workspace_id, user.org_id)
     try {
       const output = await deps.connectConsumerUseCase.execute({
         type: 'slack',
@@ -109,6 +126,8 @@ export function createConnectorRoutes(deps: ConnectorRouteDeps) {
   connectors.post('/api/connectors/mcp', async (c) => {
     const result = await parseBody(c, mcpSaveSchema)
     if (!result.success) return result.response
+    const user = c.get('user') as AuthUser
+    await guardWorkspace(result.data.workspace_id, user.org_id)
     try {
       const output = await deps.saveMcpConnectionUseCase.execute({
         workspaceId: result.data.workspace_id,
