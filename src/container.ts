@@ -14,6 +14,10 @@ import { McpClientFactoryImpl } from './infrastructure/mcp/McpClientFactoryImpl.
 import { BullMqService } from './infrastructure/queue/BullMqService.js'
 import { SlackIntegrationTester } from './infrastructure/auth/SlackIntegrationTester.js'
 import { ConsumerPosterRegistryImpl } from './infrastructure/consumers/ConsumerPosterRegistryImpl.js'
+import { registry as consumerRegistry, type ConsumerContext } from '@supaproxy/consumers'
+import pino from 'pino'
+
+const log = pino({ name: 'container' })
 
 // Application - Auth
 import { SignupUseCase } from './application/auth/SignupUseCase.js'
@@ -123,27 +127,53 @@ export function createContainer(pool: mysql.Pool) {
   const saveMcpConnectionUseCase = new SaveMcpConnectionUseCase(workspaceRepo, mcpFactory)
   const bindConsumerChannelUseCase = new BindConsumerChannelUseCase(workspaceRepo)
 
-  // Slack consumer type handler for ConnectConsumerUseCase
-  const consumerTypeHandlers = {
-    slack: {
+  // Build consumer type handlers from plugin registry
+  const consumerTypeHandlers: Record<string, import('./application/connector/ConnectConsumerUseCase.js').ConsumerTypeHandler> = {}
+  for (const plugin of consumerRegistry.list()) {
+    consumerTypeHandlers[plugin.type] = {
       buildConfig(credentials: Record<string, string>, channelId?: string) {
-        return JSON.stringify({
-          bot_token: credentials.bot_token,
-          app_token: credentials.app_token,
-          channels: channelId ? [channelId] : [],
-          allow_dms: true,
-          thread_context: true,
-        })
+        return JSON.stringify({ ...credentials, channels: channelId ? [channelId] : [] })
       },
       async verifyCredentials(credentials: Record<string, string>) {
-        const result = await integrationTester.test('slack', credentials)
+        const result = await plugin.validateCredentials(credentials)
         if (!result.ok) throw new Error(result.error || 'Verification failed')
       },
       async start(credentials: Record<string, string>) {
-        const { startSlackConsumer } = await import('./infrastructure/consumers/SlackConsumer.js')
-        await startSlackConsumer(credentials.bot_token, credentials.app_token, container)
+        const ctx: ConsumerContext = {
+          onMessage: async (msg) => {
+            const result = await executeQueryUseCase.execute(msg.channel, msg.query, {
+              consumerType: msg.consumerType,
+              channel: msg.channel,
+              userId: msg.userId,
+              userName: msg.userName,
+              sessionId: msg.threadId,
+            })
+            return { answer: result.answer, conversationId: result.conversationId || '' }
+          },
+          onError: (err) => log.error({ error: err.message }, 'Consumer error'),
+          logger: log,
+          getWorkspaceForChannel: async (channelId) => {
+            const consumers = await workspaceRepo.findActiveSlackConsumers()
+            for (const row of consumers) {
+              const cfg = typeof row.config === 'string' ? JSON.parse(row.config) : row.config
+              if ((cfg.channels || []).includes(channelId)) {
+                return { id: row.workspace_id, name: '' }
+              }
+            }
+            return null
+          },
+        }
+        await plugin.start(ctx, credentials)
+
+        // Register poster for outbound messages
+        posterRegistry.register(plugin.type, async (target, text) => {
+          const threadTs = target.externalThreadId?.split(':')[1]
+          if (target.channel && threadTs) {
+            await plugin.sendMessage(target.channel, text, threadTs)
+          }
+        })
       },
-    },
+    }
   }
   const connectConsumerUseCase = new ConnectConsumerUseCase(workspaceRepo, consumerTypeHandlers)
 
@@ -163,7 +193,7 @@ export function createContainer(pool: mysql.Pool) {
     // Infrastructure
     orgRepo, workspaceRepo, conversationRepo, auditRepo, modelRepo,
     passwordService, tokenService, aiProvider, mcpFactory,
-    queueService, integrationTester, posterRegistry,
+    queueService, integrationTester, posterRegistry, consumerRegistry,
     // Middleware
     requireAuth,
     // Use cases
