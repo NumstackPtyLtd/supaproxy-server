@@ -1,6 +1,57 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { TextBlock } from '@anthropic-ai/sdk/resources/messages.js'
-import type { AIProvider, AIMessage, AIToolSpec, AIResponse, AIContentBlock } from '../../application/ports/AIProvider.js'
+import type { AIProvider, AIMessage, AIToolSpec, AIResponse, AIContentBlock, AIUsage } from '../../application/ports/AIProvider.js'
+import pino from 'pino'
+
+const log = pino({ name: 'anthropic-provider' })
+
+/**
+ * Anthropic pricing per million tokens.
+ * Source: https://docs.anthropic.com/en/docs/about-claude/pricing
+ *
+ * When Anthropic updates pricing or adds models, update this table.
+ * The provider owns its pricing — no external dependency needed.
+ */
+const PRICING: Record<string, { input: number; output: number; cacheWrite?: number; cacheRead?: number }> = {
+  'claude-opus-4':         { input: 15,   output: 75,   cacheWrite: 18.75, cacheRead: 1.50  },
+  'claude-sonnet-4':       { input: 3,    output: 15,   cacheWrite: 3.75,  cacheRead: 0.30  },
+  'claude-3-5-sonnet':     { input: 3,    output: 15,   cacheWrite: 3.75,  cacheRead: 0.30  },
+  'claude-3-5-haiku':      { input: 0.80, output: 4,    cacheWrite: 1.00,  cacheRead: 0.08  },
+  'claude-3-opus':         { input: 15,   output: 75,   cacheWrite: 18.75, cacheRead: 1.50  },
+  'claude-3-sonnet':       { input: 3,    output: 15 },
+  'claude-3-haiku':        { input: 0.25, output: 1.25 },
+}
+
+function resolvePrice(model: string): { input: number; output: number; cacheWrite: number; cacheRead: number } {
+  // Try exact match first, then prefix match
+  for (const [prefix, pricing] of Object.entries(PRICING)) {
+    if (model.startsWith(prefix)) {
+      return { input: pricing.input, output: pricing.output, cacheWrite: pricing.cacheWrite ?? pricing.input * 1.25, cacheRead: pricing.cacheRead ?? pricing.input * 0.1 }
+    }
+  }
+  log.warn({ model }, 'Unknown model for pricing — defaulting to Sonnet rates')
+  return { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.30 }
+}
+
+function calculateUsage(model: string, raw: Anthropic.Messages.Usage): AIUsage {
+  const price = resolvePrice(model)
+  const cacheCreation = raw.cache_creation_input_tokens ?? 0
+  const cacheRead = raw.cache_read_input_tokens ?? 0
+
+  const cost =
+    (raw.input_tokens * price.input +
+     raw.output_tokens * price.output +
+     cacheCreation * price.cacheWrite +
+     cacheRead * price.cacheRead) / 1_000_000
+
+  return {
+    input_tokens: raw.input_tokens,
+    output_tokens: raw.output_tokens,
+    cache_creation_tokens: cacheCreation || undefined,
+    cache_read_tokens: cacheRead || undefined,
+    cost_usd: cost,
+  }
+}
 
 export class AnthropicProvider implements AIProvider {
   private client: Anthropic | null = null
@@ -47,7 +98,7 @@ export class AnthropicProvider implements AIProvider {
 
     return {
       content: response.content.map(block => this.fromAnthropicBlock(block)),
-      usage: response.usage,
+      usage: calculateUsage(params.model, response.usage),
       stop_reason: response.stop_reason,
     }
   }

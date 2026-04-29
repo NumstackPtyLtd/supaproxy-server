@@ -217,7 +217,7 @@ export function mockAIProvider(): AIProvider {
   return {
     createMessage: vi.fn().mockResolvedValue({
       content: [{ type: 'text', text: 'AI response' }],
-      usage: { input_tokens: 100, output_tokens: 50 },
+      usage: { input_tokens: 100, output_tokens: 50, cost_usd: 0.001050 },
       stop_reason: 'end_turn',
     }),
     createSimpleMessage: vi.fn().mockResolvedValue('AI response'),

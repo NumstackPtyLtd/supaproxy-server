@@ -10,51 +10,6 @@ import pino from 'pino'
 
 const log = pino({ name: 'execute-query' })
 
-/** Per-million-token pricing for known models. */
-const MODEL_PRICING: Record<string, { input: number; output: number }> = {
-  // Claude 4 / Opus
-  'claude-opus-4-20250514': { input: 15, output: 75 },
-  'claude-opus-4-0': { input: 15, output: 75 },
-  // Claude 3.5 / Sonnet
-  'claude-sonnet-4-20250514': { input: 3, output: 15 },
-  'claude-sonnet-4-0': { input: 3, output: 15 },
-  'claude-3-5-sonnet-20241022': { input: 3, output: 15 },
-  'claude-3-5-sonnet-latest': { input: 3, output: 15 },
-  // Claude 3 Haiku
-  'claude-3-5-haiku-20241022': { input: 0.80, output: 4 },
-  'claude-3-5-haiku-latest': { input: 0.80, output: 4 },
-  'claude-3-haiku-20240307': { input: 0.25, output: 1.25 },
-  // Claude 3 Opus (legacy)
-  'claude-3-opus-20240229': { input: 15, output: 75 },
-  'claude-3-opus-latest': { input: 15, output: 75 },
-  // Claude 3 Sonnet (legacy)
-  'claude-3-sonnet-20240229': { input: 3, output: 15 },
-  // GPT-4o (OpenAI-compatible providers)
-  'gpt-4o': { input: 2.50, output: 10 },
-  'gpt-4o-mini': { input: 0.15, output: 0.60 },
-  'gpt-4-turbo': { input: 10, output: 30 },
-  'gpt-4': { input: 30, output: 60 },
-  'gpt-3.5-turbo': { input: 0.50, output: 1.50 },
-}
-
-/** Fallback: match model string prefix to find pricing. */
-function findPricing(model: string): { input: number; output: number } {
-  if (MODEL_PRICING[model]) return MODEL_PRICING[model]
-  // Try prefix matching (e.g. "claude-3-5-sonnet-20241022" matches "claude-3-5-sonnet")
-  for (const [key, pricing] of Object.entries(MODEL_PRICING)) {
-    if (model.startsWith(key.replace(/-\d{8}$/, '').replace(/-latest$/, ''))) return pricing
-  }
-  // Default to Sonnet pricing as a reasonable middle ground
-  log.warn({ model }, 'Unknown model for cost calculation, using default pricing')
-  return { input: 3, output: 15 }
-}
-
-/** Calculate cost in USD from token counts and model. */
-function calculateCost(model: string, inputTokens: number, outputTokens: number): number {
-  const pricing = findPricing(model)
-  return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000
-}
-
 interface McpServerConfig {
   transport?: string
   url?: string
@@ -160,7 +115,7 @@ export class ExecuteQueryUseCase {
       })
 
       result.durationMs = Date.now() - startTime
-      result.costUsd = calculateCost(workspace.model, result.tokensInput, result.tokensOutput)
+      // Cost is accumulated per-round from the provider's usage.cost_usd
 
       const auditLogId = generateId()
       await this.writeAuditLog(auditLogId, workspaceId, conversationId, query, result, meta)
@@ -263,6 +218,7 @@ export class ExecuteQueryUseCase {
 
         result.tokensInput += response.usage.input_tokens
         result.tokensOutput += response.usage.output_tokens
+        result.costUsd += response.usage.cost_usd
 
         const textParts: string[] = []
         const toolUses: AIContentBlock[] = []

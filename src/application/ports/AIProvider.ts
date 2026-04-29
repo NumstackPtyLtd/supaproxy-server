@@ -17,9 +17,18 @@ export interface AIToolSpec {
   input_schema: Record<string, unknown>
 }
 
+export interface AIUsage {
+  input_tokens: number
+  output_tokens: number
+  cache_creation_tokens?: number
+  cache_read_tokens?: number
+  /** Cost in USD calculated by the provider using model-specific pricing. */
+  cost_usd: number
+}
+
 export interface AIResponse {
   content: AIContentBlock[]
-  usage: { input_tokens: number; output_tokens: number }
+  usage: AIUsage
   stop_reason: string | null
 }
 
