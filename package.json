@@ -20,7 +20,7 @@
     "@hono/zod-openapi": "0.18.4",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "@slack/bolt": "^4.2.0",
-    "@supaproxy/consumers": "link:../supaproxy-consumers",
+    "@supaproxy/consumers": "0.1.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.74.1",
     "dotenv": "^17.4.2",

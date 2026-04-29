@@ -84,7 +84,7 @@ serve({ fetch: app.fetch, port: PORT }, async () => {
     if (botToken && appToken && container.consumerRegistry.has('slack')) {
       const plugin = container.consumerRegistry.get('slack')
       await plugin.start({
-        onMessage: async (msg) => {
+        onMessage: async (msg: import('@supaproxy/consumers').IncomingMessage) => {
           const result = await container.executeQueryUseCase.execute(msg.channel, msg.query, {
             consumerType: msg.consumerType,
             channel: msg.channel,
@@ -94,9 +94,9 @@ serve({ fetch: app.fetch, port: PORT }, async () => {
           })
           return { answer: result.answer, conversationId: result.conversationId || '' }
         },
-        onError: (err) => log.error({ error: err.message }, 'Consumer error'),
+        onError: (err: Error) => log.error({ error: err.message }, 'Consumer error'),
         logger: log,
-        getWorkspaceForChannel: async (channelId) => {
+        getWorkspaceForChannel: async (channelId: string): Promise<import('@supaproxy/consumers').Workspace | null> => {
           const consumers = await container.workspaceRepo.findActiveSlackConsumers()
           for (const row of consumers) {
             const cfg = typeof row.config === 'string' ? JSON.parse(row.config) : row.config

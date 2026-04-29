@@ -14,7 +14,7 @@ import { McpClientFactoryImpl } from './infrastructure/mcp/McpClientFactoryImpl.
 import { BullMqService } from './infrastructure/queue/BullMqService.js'
 import { SlackIntegrationTester } from './infrastructure/auth/SlackIntegrationTester.js'
 import { ConsumerPosterRegistryImpl } from './infrastructure/consumers/ConsumerPosterRegistryImpl.js'
-import { registry as consumerRegistry, type ConsumerContext } from '@supaproxy/consumers'
+import { registry as consumerRegistry, type ConsumerContext, type IncomingMessage, type Workspace } from '@supaproxy/consumers'
 import pino from 'pino'
 
 const log = pino({ name: 'container' })
@@ -140,7 +140,7 @@ export function createContainer(pool: mysql.Pool) {
       },
       async start(credentials: Record<string, string>) {
         const ctx: ConsumerContext = {
-          onMessage: async (msg) => {
+          onMessage: async (msg: IncomingMessage) => {
             const result = await executeQueryUseCase.execute(msg.channel, msg.query, {
               consumerType: msg.consumerType,
               channel: msg.channel,
@@ -150,9 +150,9 @@ export function createContainer(pool: mysql.Pool) {
             })
             return { answer: result.answer, conversationId: result.conversationId || '' }
           },
-          onError: (err) => log.error({ error: err.message }, 'Consumer error'),
+          onError: (err: Error) => log.error({ error: err.message }, 'Consumer error'),
           logger: log,
-          getWorkspaceForChannel: async (channelId) => {
+          getWorkspaceForChannel: async (channelId: string): Promise<Workspace | null> => {
             const consumers = await workspaceRepo.findActiveSlackConsumers()
             for (const row of consumers) {
               const cfg = typeof row.config === 'string' ? JSON.parse(row.config) : row.config
