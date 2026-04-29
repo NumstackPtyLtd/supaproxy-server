@@ -38,9 +38,13 @@ export default defineConfig({
         // ExecuteQueryUseCase is the AI agent loop; requires integration-level mocking
         'src/application/query/ExecuteQueryUseCase.ts',
 
-        // Composition root and entrypoint (integration-level, not unit-testable)
+        // Composition root, entrypoints, and runtime wiring (integration-level)
         'src/container.ts',
         'src/index.ts',
+        'src/app.ts',
+        'src/server.ts',
+        'src/startup.ts',
+        'src/config.ts',
         'src/openapi.ts',
 
         // Database setup (requires live MySQL)
