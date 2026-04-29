@@ -56,16 +56,38 @@ src/
 └── observability/audit.ts           File-based audit logging
 ```
 
-### Cloud Extension Point
+### Multi-Tenancy Extension Point
 
 The server supports pluggable multi-tenancy via `TenantService` (in `application/ports/TenantService.ts`):
 
 - **Self-hosted**: `NoOpTenantService` — single-tenant, no org scoping
-- **Cloud**: Injects `CloudTenantService` from the private `supaproxy-cloud` repo
+- **Custom deployments**: Inject a custom `TenantService` implementation for multi-tenant setups
 
 The `createContainer()` function accepts an optional `tenantService` parameter. All routes delegate workspace access checks to this service. Self-hosters never need to think about this — it's transparent.
 
 When adding new routes that access workspace data, always use `guardWorkspace()` to delegate access checks to the tenant service.
+
+### Composable Server API
+
+The server is split into composable pieces that can be imported independently:
+
+| File | Export | Purpose |
+|---|---|---|
+| `server.ts` | Public API | Re-exports all composable pieces |
+| `app.ts` | `createApp(container)` | Creates Hono app with all routes mounted |
+| `startup.ts` | `startConsumers()`, `startWorkers()` | Boot sequence for consumers and lifecycle workers |
+| `container.ts` | `createContainer(pool, options?)` | Dependency injection root, accepts optional `tenantService` |
+| `index.ts` | Entry point | Uses the composable pieces directly |
+
+Custom deployments can import from `supaproxy-server/server`:
+
+```typescript
+import { createContainer, createApp, startConsumers, startWorkers } from 'supaproxy-server/server'
+
+const container = createContainer(pool, { tenantService: myTenantService })
+const app = createApp(container)
+// mount additional routes
+```
 
 ## Dependency flow (STRICT)
 
@@ -89,7 +111,7 @@ Rules:
 | supaproxy-sdk | Public (MIT) | TypeScript SDK (`@supaproxy/sdk` on npm) |
 | supaproxy-dashboard | Private | Astro + React frontend |
 | supaproxy-docs | Private | Mintlify documentation site |
-| supaproxy-cloud | Private | Cloud multi-tenancy (CloudTenantService) |
+| overlay repo | Private | Multi-tenancy, billing, managed infrastructure |
 
 ## Start Dev
 
