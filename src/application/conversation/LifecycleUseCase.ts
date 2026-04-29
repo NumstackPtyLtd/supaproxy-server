@@ -1,7 +1,7 @@
 import type { ConversationRepository } from '../../domain/conversation/repository.js'
 import type { OrganisationRepository } from '../../domain/organisation/repository.js'
 import type { QueueService } from '../ports/QueueService.js'
-import type { AIProvider } from '../ports/AIProvider.js'
+import type { registry as ProviderRegistryType, ProviderPlugin } from '@supaproxy/providers'
 import type { ConsumerPosterRegistry, ColdMessageTarget } from '../ports/ConsumerPoster.js'
 import { generateId } from '../../domain/shared/EntityId.js'
 import pino from 'pino'
@@ -13,7 +13,7 @@ export class LifecycleUseCase {
     private readonly conversationRepo: ConversationRepository,
     private readonly orgRepo: OrganisationRepository,
     private readonly queueService: QueueService,
-    private readonly aiProvider: AIProvider,
+    private readonly providerRegistry: typeof ProviderRegistryType,
     private readonly posterRegistry: ConsumerPosterRegistry,
   ) {}
 
@@ -74,19 +74,21 @@ export class LifecycleUseCase {
         return
       }
 
-      const apiKey = await this.orgRepo.getSettingValue('ai_api_key')
-        || await this.orgRepo.getSettingValue('anthropic_api_key')
+      const orgSettings = await this.orgRepo.getSettingValues(['ai_api_key', 'ai_provider_type'])
+      const apiKey = orgSettings['ai_api_key']
+      const providerType = orgSettings['ai_provider_type'] || (() => { throw new Error('No AI provider configured. Set ai_provider_type in Settings > Integrations.') })()
       if (!apiKey) {
         await this.conversationRepo.updateStatsStatus(statsId, 'failed')
         return
       }
+      const provider = this.providerRegistry.get(providerType)
 
       const durationSec = timestamps?.first_message_at && timestamps?.closed_at
         ? Math.round((new Date(timestamps.closed_at).getTime() - new Date(timestamps.first_message_at).getTime()) / 1000)
         : 0
 
       const transcript = messages.map(m => `${m.role}: ${m.content}`).join('\n\n')
-      const analysisText = await this.aiProvider.createSimpleMessage({
+      const analysisText = await provider.createSimpleMessage({
         apiKey,
         model,
         maxTokens: 1024,
@@ -128,15 +130,17 @@ export class LifecycleUseCase {
       const messages = await this.conversationRepo.findMessages(conversationId)
       if (messages.length === 0) return ''
 
-      const apiKey = await this.orgRepo.getSettingValue('ai_api_key')
-        || await this.orgRepo.getSettingValue('anthropic_api_key')
+      const coldSettings = await this.orgRepo.getSettingValues(['ai_api_key', 'ai_provider_type'])
+      const apiKey = coldSettings['ai_api_key']
+      const providerType = coldSettings['ai_provider_type'] || (() => { throw new Error('No AI provider configured. Set ai_provider_type in Settings > Integrations.') })()
       if (!apiKey) return ''
 
       const model = await this.conversationRepo.getWorkspaceModel(conversationId)
       if (!model) return ''
 
+      const provider = this.providerRegistry.get(providerType)
       const transcript = messages.slice(-6).map(m => `${m.role}: ${m.content}`).join('\n\n')
-      return this.aiProvider.createSimpleMessage({
+      return provider.createSimpleMessage({
         apiKey,
         model,
         maxTokens: 150,

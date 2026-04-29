@@ -1,7 +1,8 @@
 import type { WorkspaceRepository } from '../../domain/workspace/repository.js'
 import type { OrganisationRepository } from '../../domain/organisation/repository.js'
 import type { AuditLogRepository, AuditLogData } from '../../domain/audit/repository.js'
-import type { AIProvider, AIToolSpec, AIMessage, AIContentBlock } from '../ports/AIProvider.js'
+import type { AIToolSpec, AIMessage, AIContentBlock, ProviderPlugin } from '@supaproxy/providers'
+import type { registry as ProviderRegistryType } from '@supaproxy/providers'
 import type { McpClientFactory, McpConnection } from '../ports/McpClient.js'
 import type { ManageConversationUseCase } from '../conversation/ManageConversationUseCase.js'
 import { generateId } from '../../domain/shared/EntityId.js'
@@ -60,7 +61,7 @@ export class ExecuteQueryUseCase {
     private readonly workspaceRepo: WorkspaceRepository,
     private readonly orgRepo: OrganisationRepository,
     private readonly auditRepo: AuditLogRepository,
-    private readonly aiProvider: AIProvider,
+    private readonly providerRegistry: typeof ProviderRegistryType,
     private readonly mcpFactory: McpClientFactory,
     private readonly conversationUseCase: ManageConversationUseCase,
   ) {}
@@ -77,10 +78,15 @@ export class ExecuteQueryUseCase {
     )
     const history = await this.conversationUseCase.getHistory(conversationId)
 
-    const apiKey = await this.getApiKey()
-    if (!apiKey) {
+    let provider: ProviderPlugin
+    let apiKey: string
+    try {
+      const resolved = await this.resolveProvider()
+      provider = resolved.provider
+      apiKey = resolved.apiKey
+    } catch {
       return this.buildResult({
-        answer: 'No AI provider connected. The proxy needs an LLM to route queries to. Go to Settings \u2192 Integrations and add your API key.',
+        answer: 'No AI provider connected. The proxy needs an LLM to route queries to. Go to Settings → Integrations and add your API key.',
         error: 'no_api_key',
         durationMs: Date.now() - startTime,
         conversationId,
@@ -101,7 +107,11 @@ export class ExecuteQueryUseCase {
         })
       }
 
-      const result = await this.runAgentLoop(query, {
+      if (!workspace.model) {
+        throw new Error('No AI model configured for this workspace. Set a model in workspace settings.')
+      }
+
+      const result = await this.runAgentLoop(query, provider, {
         model: workspace.model,
         systemPrompt: workspace.system_prompt || 'You are a helpful assistant.',
         maxToolRounds: workspace.max_tool_rounds || 10,
@@ -111,7 +121,7 @@ export class ExecuteQueryUseCase {
       })
 
       result.durationMs = Date.now() - startTime
-      result.costUsd = (result.tokensInput * 3 + result.tokensOutput * 15) / 1_000_000
+      // Cost is accumulated per-round from the provider's usage.cost_usd
 
       const auditLogId = generateId()
       await this.writeAuditLog(auditLogId, workspaceId, conversationId, query, result, meta)
@@ -138,9 +148,13 @@ export class ExecuteQueryUseCase {
     }
   }
 
-  private async getApiKey(): Promise<string | null> {
-    const settings = await this.orgRepo.getSettingValues(['ai_api_key', 'anthropic_api_key'])
-    return settings['ai_api_key'] || settings['anthropic_api_key'] || null
+  private async resolveProvider(): Promise<{ provider: ProviderPlugin; apiKey: string }> {
+    const settings = await this.orgRepo.getSettingValues(['ai_provider_type', 'ai_api_key', 'anthropic_api_key'])
+    const providerType = settings['ai_provider_type'] || (() => { throw new Error('No AI provider configured. Set ai_provider_type in Settings > Integrations.') })()
+    const apiKey = settings['ai_api_key'] || settings['anthropic_api_key'] || null
+    if (!apiKey) throw new ConfigurationError('No AI API key configured. Set it in Settings > Integrations.')
+    const provider = this.providerRegistry.get(providerType)
+    return { provider, apiKey }
   }
 
   private async discoverTools(
@@ -187,7 +201,7 @@ export class ExecuteQueryUseCase {
     return { tools, mcpConnections }
   }
 
-  private async runAgentLoop(query: string, config: {
+  private async runAgentLoop(query: string, provider: ProviderPlugin, config: {
     model: string
     systemPrompt: string
     maxToolRounds: number
@@ -204,7 +218,7 @@ export class ExecuteQueryUseCase {
 
     try {
       for (let round = 0; round < config.maxToolRounds; round++) {
-        const response = await this.aiProvider.createMessage({
+        const response = await provider.createMessage({
           model: config.model,
           maxTokens: 4096,
           system: config.systemPrompt,
@@ -214,6 +228,7 @@ export class ExecuteQueryUseCase {
 
         result.tokensInput += response.usage.input_tokens
         result.tokensOutput += response.usage.output_tokens
+        result.costUsd += response.usage.cost_usd
 
         const textParts: string[] = []
         const toolUses: AIContentBlock[] = []
@@ -259,7 +274,7 @@ export class ExecuteQueryUseCase {
       }
     } catch (err) {
       result.error = (err as Error).message
-      result.answer = `Error: ${result.error}`
+      result.answer = "I'm sorry, I wasn't able to process your request. Please try again or rephrase your question."
       log.error({ error: result.error }, 'Agent loop failed')
     }
 
