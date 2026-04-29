@@ -67,7 +67,10 @@ export class MysqlWorkspaceRepository implements WorkspaceRepository {
     )
   }
 
-  async listNonArchived(): Promise<WorkspaceListItemData[]> {
+  async listNonArchived(orgId: string | null): Promise<WorkspaceListItemData[]> {
+    const where = orgId ? 'WHERE w.org_id = ? AND w.status != ?' : 'WHERE w.status != ?'
+    const params = orgId ? [orgId, 'archived'] : ['archived']
+
     const [rows] = await this.pool.execute<WsListRow[]>(`
       SELECT w.id, w.name, t.name as team, w.status, w.model, w.created_at,
         (SELECT COUNT(*) FROM connections WHERE workspace_id = w.id) as connection_count,
@@ -77,9 +80,9 @@ export class MysqlWorkspaceRepository implements WorkspaceRepository {
         (SELECT COALESCE(SUM(cost_usd), 0) FROM audit_logs WHERE workspace_id = w.id AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())) as cost_mtd
       FROM workspaces w
       LEFT JOIN teams t ON w.team_id = t.id
-      WHERE w.status != 'archived'
+      ${where}
       ORDER BY w.name
-    `)
+    `, params)
     return rows
   }
 

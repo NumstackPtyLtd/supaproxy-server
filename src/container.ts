@@ -14,6 +14,8 @@ import { McpClientFactoryImpl } from './infrastructure/mcp/McpClientFactoryImpl.
 import { BullMqService } from './infrastructure/queue/BullMqService.js'
 import { SlackIntegrationTester } from './infrastructure/auth/SlackIntegrationTester.js'
 import { ConsumerPosterRegistryImpl } from './infrastructure/consumers/ConsumerPosterRegistryImpl.js'
+import { NoOpTenantService } from './infrastructure/tenant/NoOpTenantService.js'
+import type { TenantService } from './application/ports/TenantService.js'
 import { registry as consumerRegistry, type ConsumerContext, type IncomingMessage, type Workspace } from '@supaproxy/consumers'
 import pino from 'pino'
 
@@ -75,7 +77,11 @@ import { createConnectorRoutes } from './presentation/routes/connectors.js'
 import { createQueryRoutes } from './presentation/routes/query.js'
 import { createQueueRoutes } from './presentation/routes/queues.js'
 
-export function createContainer(pool: mysql.Pool) {
+export function createContainer(pool: mysql.Pool, options?: { tenantService?: TenantService }) {
+  // Tenant service — defaults to NoOp (single-tenant) for open-source.
+  // Cloud deployment passes a multi-tenant implementation.
+  const tenantService: TenantService = options?.tenantService ?? new NoOpTenantService()
+
   // Infrastructure singletons
   const orgRepo = new MysqlOrganisationRepository(pool)
   const workspaceRepo = new MysqlWorkspaceRepository(pool)
@@ -184,17 +190,17 @@ export function createContainer(pool: mysql.Pool) {
   // Build routes
   const authRoutes = createAuthRoutes({ signupUseCase, loginUseCase, tokenService, dashboardUrl: DASHBOARD_URL, isProduction: IS_PRODUCTION, cookieDomain: COOKIE_DOMAIN })
   const orgRoutes = createOrgRoutes({ getOrgUseCase, updateOrgUseCase, getOrgSettingsUseCase, updateOrgSettingUseCase, testIntegrationUseCase, listOrgUsersUseCase, orgRepo, requireAuth })
-  const workspaceRoutes = createWorkspaceRoutes({ createWorkspaceUseCase, updateWorkspaceUseCase, getWorkspaceDetailUseCase, listWorkspacesUseCase, getWorkspaceSummaryUseCase, getDashboardUseCase, getActivityUseCase, deleteConnectionUseCase, getConnectionsUseCase, getKnowledgeUseCase, getComplianceUseCase, orgRepo, workspaceRepo, requireAuth })
-  const conversationRoutes = createConversationRoutes({ listConversationsUseCase, getConversationDetailUseCase, closeConversationUseCase, requireAuth })
-  const connectorRoutes = createConnectorRoutes({ testMcpConnectionUseCase, saveMcpConnectionUseCase, bindConsumerChannelUseCase, connectConsumerUseCase, requireAuth })
-  const queryRoutes = createQueryRoutes({ executeQueryUseCase, requireAuth })
+  const workspaceRoutes = createWorkspaceRoutes({ createWorkspaceUseCase, updateWorkspaceUseCase, getWorkspaceDetailUseCase, listWorkspacesUseCase, getWorkspaceSummaryUseCase, getDashboardUseCase, getActivityUseCase, deleteConnectionUseCase, getConnectionsUseCase, getKnowledgeUseCase, getComplianceUseCase, orgRepo, workspaceRepo, tenantService, requireAuth })
+  const conversationRoutes = createConversationRoutes({ listConversationsUseCase, getConversationDetailUseCase, closeConversationUseCase, workspaceRepo, tenantService, requireAuth })
+  const connectorRoutes = createConnectorRoutes({ testMcpConnectionUseCase, saveMcpConnectionUseCase, bindConsumerChannelUseCase, connectConsumerUseCase, workspaceRepo, tenantService, requireAuth })
+  const queryRoutes = createQueryRoutes({ executeQueryUseCase, workspaceRepo, tenantService, requireAuth })
   const queueRoutes = createQueueRoutes({ manageQueuesUseCase, queueService, requireAuth })
 
   const container = {
     // Infrastructure
     orgRepo, workspaceRepo, conversationRepo, auditRepo, modelRepo,
     passwordService, tokenService, providerRegistry, mcpFactory,
-    queueService, integrationTester, posterRegistry, consumerRegistry,
+    queueService, integrationTester, posterRegistry, consumerRegistry, tenantService,
     // Middleware
     requireAuth,
     // Use cases
