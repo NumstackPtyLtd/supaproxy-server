@@ -101,6 +101,10 @@ export class ExecuteQueryUseCase {
         })
       }
 
+      if (!workspace.model) {
+        throw new Error('No AI model configured for this workspace. Set a model in workspace settings.')
+      }
+
       const result = await this.runAgentLoop(query, {
         model: workspace.model,
         systemPrompt: workspace.system_prompt || 'You are a helpful assistant.',
@@ -259,7 +263,7 @@ export class ExecuteQueryUseCase {
       }
     } catch (err) {
       result.error = (err as Error).message
-      result.answer = `Error: ${result.error}`
+      result.answer = "I'm sorry, I wasn't able to process your request. Please try again or rephrase your question."
       log.error({ error: result.error }, 'Agent loop failed')
     }
 
