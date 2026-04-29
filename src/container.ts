@@ -9,7 +9,7 @@ import { MysqlAuditLogRepository } from './infrastructure/persistence/mysql/Mysq
 import { MysqlModelRepository } from './infrastructure/persistence/mysql/MysqlModelRepository.js'
 import { BcryptPasswordService } from './infrastructure/auth/BcryptPasswordService.js'
 import { JwtTokenService } from './infrastructure/auth/JwtTokenService.js'
-import { AnthropicProvider } from './infrastructure/ai/AnthropicProvider.js'
+import { registry as providerRegistry } from '@supaproxy/providers'
 import { McpClientFactoryImpl } from './infrastructure/mcp/McpClientFactoryImpl.js'
 import { BullMqService } from './infrastructure/queue/BullMqService.js'
 import { SlackIntegrationTester } from './infrastructure/auth/SlackIntegrationTester.js'
@@ -84,7 +84,8 @@ export function createContainer(pool: mysql.Pool) {
   const modelRepo = new MysqlModelRepository(pool)
   const passwordService = new BcryptPasswordService()
   const tokenService = new JwtTokenService(JWT_SECRET)
-  const aiProvider = new AnthropicProvider()
+  // Provider registry passed to use cases — they resolve the provider
+  // dynamically from org settings at query time.
   const mcpFactory = new McpClientFactoryImpl()
   const queueService = new BullMqService(REDIS_HOST, REDIS_PORT)
   const integrationTester = new SlackIntegrationTester()
@@ -121,7 +122,7 @@ export function createContainer(pool: mysql.Pool) {
   const getConversationDetailUseCase = new GetConversationDetailUseCase(conversationRepo)
   const manageConversationUseCase = new ManageConversationUseCase(conversationRepo)
   const closeConversationUseCase = new CloseConversationUseCase(conversationRepo, queueService)
-  const lifecycleUseCase = new LifecycleUseCase(conversationRepo, orgRepo, queueService, aiProvider, posterRegistry)
+  const lifecycleUseCase = new LifecycleUseCase(conversationRepo, orgRepo, queueService, providerRegistry, posterRegistry)
 
   const testMcpConnectionUseCase = new TestMcpConnectionUseCase(mcpFactory)
   const saveMcpConnectionUseCase = new SaveMcpConnectionUseCase(workspaceRepo, mcpFactory)
@@ -177,7 +178,7 @@ export function createContainer(pool: mysql.Pool) {
   }
   const connectConsumerUseCase = new ConnectConsumerUseCase(workspaceRepo, consumerTypeHandlers)
 
-  const executeQueryUseCase = new ExecuteQueryUseCase(workspaceRepo, orgRepo, auditRepo, aiProvider, mcpFactory, manageConversationUseCase)
+  const executeQueryUseCase = new ExecuteQueryUseCase(workspaceRepo, orgRepo, auditRepo, providerRegistry, mcpFactory, manageConversationUseCase)
   const manageQueuesUseCase = new ManageQueuesUseCase(queueService)
 
   // Build routes
@@ -192,7 +193,7 @@ export function createContainer(pool: mysql.Pool) {
   const container = {
     // Infrastructure
     orgRepo, workspaceRepo, conversationRepo, auditRepo, modelRepo,
-    passwordService, tokenService, aiProvider, mcpFactory,
+    passwordService, tokenService, providerRegistry, mcpFactory,
     queueService, integrationTester, posterRegistry, consumerRegistry,
     // Middleware
     requireAuth,

@@ -215,6 +215,12 @@ export function mockMcpFactory(): McpClientFactory {
 
 export function mockAIProvider(): AIProvider {
   return {
+    type: 'mock',
+    name: 'Mock Provider',
+    description: 'Test provider',
+    configSchema: { fields: [] },
+    models: [{ id: 'mock-model', label: 'Mock Model', default: true }],
+    setApiKey: vi.fn(),
     createMessage: vi.fn().mockResolvedValue({
       content: [{ type: 'text', text: 'AI response' }],
       usage: { input_tokens: 100, output_tokens: 50, cost_usd: 0.001050 },

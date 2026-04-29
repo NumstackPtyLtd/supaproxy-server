@@ -26,6 +26,9 @@ dependencies:
   '@supaproxy/consumers':
     specifier: 0.1.0
     version: 0.1.0(@slack/bolt@4.7.0)
+  '@supaproxy/providers':
+    specifier: 0.1.0
+    version: 0.1.0(@anthropic-ai/sdk@0.90.0)
   bcrypt:
     specifier: ^6.0.0
     version: 6.0.0
@@ -875,6 +878,21 @@ packages:
         optional: true
     dependencies:
       '@slack/bolt': 4.7.0(@types/express@5.0.6)
+      pino: 9.14.0
+    dev: false
+
+  /@supaproxy/providers@0.1.0(@anthropic-ai/sdk@0.90.0):
+    resolution: {integrity: sha512-3BUIltARMcfN59i+bwqfULFwpogOaAncDE8ugTRKwSZJJvaBzlQ3ZyoJ+OTGDAe10jWSz/XYMsUkUe2pYZZQrw==}
+    peerDependencies:
+      '@anthropic-ai/sdk': '>=0.30.0'
+      openai: '>=4.0.0'
+    peerDependenciesMeta:
+      '@anthropic-ai/sdk':
+        optional: true
+      openai:
+        optional: true
+    dependencies:
+      '@anthropic-ai/sdk': 0.90.0(zod@3.25.76)
       pino: 9.14.0
     dev: false
 
