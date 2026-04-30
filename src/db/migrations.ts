@@ -386,7 +386,12 @@ const migrations: Migration[] = [
     version: 9,
     name: 'add unique constraint on teams (org_id, name)',
     up: async (pool) => {
-      // Deduplicate any existing duplicates first (keep the earliest)
+      // Check if constraint already exists (may have been applied as old migration 8)
+      const [rows] = await pool.execute<mysql.RowDataPacket[]>(
+        `SELECT COUNT(*) as cnt FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'teams' AND CONSTRAINT_NAME = 'unique_org_team'`
+      );
+      if (rows[0]?.cnt > 0) return; // Already exists
+
       await pool.execute(`
         DELETE t1 FROM teams t1
         INNER JOIN teams t2
