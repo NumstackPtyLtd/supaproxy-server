@@ -1,6 +1,7 @@
 import mysql from 'mysql2/promise';
 import pino from 'pino';
 import type { ColumnInfoRow } from './types.js';
+import { generateId } from '../domain/shared/EntityId.js';
 
 const log = pino({ name: 'migrations' });
 
@@ -366,6 +367,23 @@ const migrations: Migration[] = [
   },
   {
     version: 8,
+    name: 'set default ai_provider_type for existing orgs',
+    up: async (pool) => {
+      // Ensure existing orgs have ai_provider_type set so the provider
+      // resolution doesn't throw. New orgs will set this during setup.
+      const [orgs] = await pool.execute<mysql.RowDataPacket[]>(
+        `SELECT id FROM organisations WHERE id NOT IN (SELECT org_id FROM org_settings WHERE key_name = 'ai_provider_type')`
+      );
+      for (const org of orgs) {
+        await pool.execute(
+          `INSERT INTO org_settings (id, org_id, key_name, value, is_secret) VALUES (?, ?, 'ai_provider_type', 'anthropic', 0)`,
+          [generateId(), org.id]
+        );
+      }
+    },
+  },
+  {
+    version: 9,
     name: 'add unique constraint on teams (org_id, name)',
     up: async (pool) => {
       // Deduplicate any existing duplicates first (keep the earliest)

@@ -56,6 +56,11 @@ export function createApp(container: Container, corsOrigins?: string[]): Hono {
     return c.json({ consumers: container.consumerRegistry.schemas() })
   })
 
+  // Provider types
+  app.get('/api/providers/types', (c) => {
+    return c.json({ providers: container.providerRegistry.schemas() })
+  })
+
   // Route modules
   app.route('/', container.authRoutes)
   app.route('/', container.orgRoutes)
