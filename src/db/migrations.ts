@@ -400,6 +400,18 @@ const migrations: Migration[] = [
       await pool.execute('ALTER TABLE teams ADD UNIQUE KEY unique_org_team (org_id, name)');
     },
   },
+  {
+    version: 10,
+    name: 'input screening fields on audit_logs',
+    up: async (pool) => {
+      await pool.execute(`
+        ALTER TABLE audit_logs
+        ADD COLUMN input_screening_action VARCHAR(10) NULL,
+        ADD COLUMN input_screening_categories TEXT NULL,
+        ADD COLUMN input_screening_ms INT NULL
+      `);
+    },
+  },
 ];
 
 interface SchemaMigrationRow extends mysql.RowDataPacket {

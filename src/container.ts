@@ -10,6 +10,7 @@ import { MysqlModelRepository } from './infrastructure/persistence/mysql/MysqlMo
 import { BcryptPasswordService } from './infrastructure/auth/BcryptPasswordService.js'
 import { JwtTokenService } from './infrastructure/auth/JwtTokenService.js'
 import { registry as providerRegistry } from '@supaproxy/providers'
+import { registry as guardrailRegistry } from '@supaproxy/guardrails'
 import { McpClientFactoryImpl } from './infrastructure/mcp/McpClientFactoryImpl.js'
 import { BullMqService } from './infrastructure/queue/BullMqService.js'
 import { SlackIntegrationTester } from './infrastructure/auth/SlackIntegrationTester.js'
@@ -184,7 +185,11 @@ export function createContainer(pool: mysql.Pool, options?: { tenantService?: Te
   }
   const connectConsumerUseCase = new ConnectConsumerUseCase(workspaceRepo, consumerTypeHandlers)
 
-  const executeQueryUseCase = new ExecuteQueryUseCase(workspaceRepo, orgRepo, auditRepo, providerRegistry, mcpFactory, manageConversationUseCase)
+  // Guardrails — built-in plugins from @supaproxy/guardrails registry.
+  // Additional guardrails can be added via marketplace plugins.
+  const guardrailPlugins = guardrailRegistry.byStage('pre-llm')
+
+  const executeQueryUseCase = new ExecuteQueryUseCase(workspaceRepo, orgRepo, auditRepo, providerRegistry, mcpFactory, manageConversationUseCase, guardrailPlugins)
   const manageQueuesUseCase = new ManageQueuesUseCase(queueService)
 
   // Build routes
