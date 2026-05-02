@@ -219,6 +219,29 @@ export class MysqlWorkspaceRepository implements WorkspaceRepository {
     return rows
   }
 
+  async findEnabledGuardrailConfigs(workspaceId: string): Promise<Array<{ guardrail_id: string; config: string | null }>> {
+    const [rows] = await this.pool.execute<Array<mysql.RowDataPacket & { guardrail_id: string; config: string | null }>>(
+      'SELECT guardrail_id, config FROM workspace_guardrails WHERE workspace_id = ? AND enabled = TRUE', [workspaceId]
+    )
+    return rows.map(r => ({ guardrail_id: r.guardrail_id, config: r.config }))
+  }
+
+  async enableGuardrail(id: string, workspaceId: string, guardrailId: string, config?: string): Promise<void> {
+    await this.pool.execute(
+      `INSERT INTO workspace_guardrails (id, workspace_id, guardrail_id, enabled, config)
+       VALUES (?, ?, ?, TRUE, ?)
+       ON DUPLICATE KEY UPDATE enabled = TRUE, config = VALUES(config)`,
+      [id, workspaceId, guardrailId, config || null]
+    )
+  }
+
+  async disableGuardrail(workspaceId: string, guardrailId: string): Promise<void> {
+    await this.pool.execute(
+      'UPDATE workspace_guardrails SET enabled = FALSE WHERE workspace_id = ? AND guardrail_id = ?',
+      [workspaceId, guardrailId]
+    )
+  }
+
   async findPermissions(workspaceId: string): Promise<PermissionData[]> {
     const [rows] = await this.pool.execute<PermissionRow[]>(
       'SELECT role, tool_patterns FROM permissions WHERE workspace_id = ?', [workspaceId]

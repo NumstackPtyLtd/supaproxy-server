@@ -412,6 +412,25 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 11,
+    name: 'workspace guardrails table',
+    up: async (pool) => {
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS workspace_guardrails (
+          id VARCHAR(64) PRIMARY KEY,
+          workspace_id VARCHAR(64) NOT NULL,
+          guardrail_id VARCHAR(100) NOT NULL,
+          enabled BOOLEAN DEFAULT TRUE,
+          config JSON NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_workspace_guardrail (workspace_id, guardrail_id),
+          FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+        )
+      `);
+    },
+  },
 ];
 
 interface SchemaMigrationRow extends mysql.RowDataPacket {

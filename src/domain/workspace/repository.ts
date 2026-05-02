@@ -138,6 +138,9 @@ export interface WorkspaceRepository {
 
   findKnowledge(workspaceId: string): Promise<KnowledgeSourceData[]>
   findGuardrails(workspaceId: string): Promise<GuardrailData[]>
+  findEnabledGuardrailConfigs(workspaceId: string): Promise<Array<{ guardrail_id: string; config: string | null }>>
+  enableGuardrail(id: string, workspaceId: string, guardrailId: string, config?: string): Promise<void>
+  disableGuardrail(workspaceId: string, guardrailId: string): Promise<void>
   findPermissions(workspaceId: string): Promise<PermissionData[]>
   getStats(workspaceId: string): Promise<WorkspaceStatsData>
 
