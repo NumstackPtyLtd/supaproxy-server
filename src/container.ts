@@ -187,22 +187,31 @@ export function createContainer(pool: mysql.Pool, options?: { tenantService?: Te
 
   // Guardrails — resolved per workspace at query time.
   // Only enabled guardrails run. Config is loaded from workspace_guardrails table.
-  const availableGuardrails: Record<string, () => GuardrailPlugin> = {
-    'pattern': () => new PatternGuardrail(),
-    // 'llm': () => new LlmGuardrail(config) — requires config from workspace settings
+  const patternInstance = new PatternGuardrail()
+  const availableGuardrails: Record<string, { instance: GuardrailPlugin; factory: () => GuardrailPlugin }> = {
+    'pattern': { instance: patternInstance, factory: () => new PatternGuardrail() },
   }
 
   async function resolveGuardrails(workspaceId: string): Promise<GuardrailPlugin[]> {
     const configs = await workspaceRepo.findEnabledGuardrailConfigs(workspaceId)
     const plugins: GuardrailPlugin[] = []
-    for (const { guardrail_id, config } of configs) {
-      const factory = availableGuardrails[guardrail_id]
-      if (factory) {
-        // TODO: pass parsed config to factory when guardrails support workspace-specific config
-        plugins.push(factory())
+    for (const { guardrail_id } of configs) {
+      const entry = availableGuardrails[guardrail_id]
+      if (entry) {
+        plugins.push(entry.factory())
       }
     }
     return plugins
+  }
+
+  function listAvailableGuardrails() {
+    return Object.entries(availableGuardrails).map(([id, { instance }]) => ({
+      id,
+      name: instance.name,
+      description: instance.description,
+      stage: instance.stage,
+      configSchema: instance.configSchema,
+    }))
   }
 
   const executeQueryUseCase = new ExecuteQueryUseCase(workspaceRepo, orgRepo, auditRepo, providerRegistry, mcpFactory, manageConversationUseCase, resolveGuardrails)
@@ -211,7 +220,7 @@ export function createContainer(pool: mysql.Pool, options?: { tenantService?: Te
   // Build routes
   const authRoutes = createAuthRoutes({ signupUseCase, loginUseCase, tokenService, dashboardUrl: DASHBOARD_URL, isProduction: IS_PRODUCTION, cookieDomain: COOKIE_DOMAIN })
   const orgRoutes = createOrgRoutes({ getOrgUseCase, updateOrgUseCase, getOrgSettingsUseCase, updateOrgSettingUseCase, testIntegrationUseCase, listOrgUsersUseCase, orgRepo, requireAuth })
-  const workspaceRoutes = createWorkspaceRoutes({ createWorkspaceUseCase, updateWorkspaceUseCase, getWorkspaceDetailUseCase, listWorkspacesUseCase, getWorkspaceSummaryUseCase, getDashboardUseCase, getActivityUseCase, deleteConnectionUseCase, getConnectionsUseCase, getKnowledgeUseCase, getComplianceUseCase, orgRepo, workspaceRepo, tenantService, requireAuth })
+  const workspaceRoutes = createWorkspaceRoutes({ createWorkspaceUseCase, updateWorkspaceUseCase, getWorkspaceDetailUseCase, listWorkspacesUseCase, getWorkspaceSummaryUseCase, getDashboardUseCase, getActivityUseCase, deleteConnectionUseCase, getConnectionsUseCase, getKnowledgeUseCase, getComplianceUseCase, listAvailableGuardrails, orgRepo, workspaceRepo, tenantService, requireAuth })
   const conversationRoutes = createConversationRoutes({ listConversationsUseCase, getConversationDetailUseCase, closeConversationUseCase, workspaceRepo, tenantService, requireAuth })
   const connectorRoutes = createConnectorRoutes({ testMcpConnectionUseCase, saveMcpConnectionUseCase, bindConsumerChannelUseCase, connectConsumerUseCase, workspaceRepo, tenantService, requireAuth })
   const queryRoutes = createQueryRoutes({ executeQueryUseCase, workspaceRepo, tenantService, requireAuth })
