@@ -1,25 +1,22 @@
 /**
- * Input Guardrail port — re-exports from @supaproxy/guardrails.
+ * Input Guardrail port - re-exports from @supaproxy/guardrails.
  *
- * The GuardrailPlugin interface from the package IS the port.
- * This file provides the chain runner and type aliases.
+ * Each plugin is middleware that can modify, replace, or block a query.
+ * The chain runner pipes the output of one filter into the next.
  *
- * Pipeline stages:
- *   pre-llm  — input screening (before LLM receives the query)
- *   post-llm — output validation (before user receives the response)
- *
- * Events emitted by the server after screening:
- *   guardrail.triggered — any non-pass result
- *   guardrail.blocked   — query blocked
- *   guardrail.redacted  — content redacted
+ * Events emitted by the server after processing:
+ *   guardrail.processed - every query that passes through the chain
+ *   guardrail.modified  - query was modified by one or more filters
+ *   guardrail.blocked   - query was blocked
  */
 export type {
   GuardrailPlugin as InputGuardrail,
-  GuardrailAction,
+  GuardrailInput,
+  GuardrailOutput,
   GuardrailStage,
   GuardrailContext,
-  ScreeningResult,
   PatternRule,
+  PatternAction,
 } from '@supaproxy/guardrails'
 
 export { runGuardrailChain } from './guardrailChain.js'

@@ -1,34 +1,69 @@
-import type { GuardrailPlugin, GuardrailAction, GuardrailContext, ScreeningResult } from '@supaproxy/guardrails'
+import type { GuardrailPlugin, GuardrailContext, GuardrailOutput } from '@supaproxy/guardrails'
+
+export interface ChainResult {
+  blocked: boolean
+  query: string
+  original: string
+  reason?: string
+  annotations: string[]
+  metadata: Record<string, unknown>
+  filterCount: number
+}
 
 /**
- * Runs multiple guardrails in sequence.
- * First 'block' stops the chain. Redactions accumulate.
+ * Runs multiple guardrails in sequence as middleware.
+ * Each filter receives the output of the previous one.
+ * First 'block' stops the chain.
+ * Modifications accumulate through the pipeline.
  */
 export async function runGuardrailChain(
   guardrails: GuardrailPlugin[],
   query: string,
   context: GuardrailContext,
-): Promise<{ finalAction: GuardrailAction; results: ScreeningResult[]; sanitisedQuery: string }> {
-  const results: ScreeningResult[] = []
+): Promise<ChainResult> {
   let currentQuery = query
+  const allAnnotations: string[] = []
+  let metadata: Record<string, unknown> = {}
 
   for (const guardrail of guardrails) {
-    const result = await guardrail.screen(currentQuery, context)
-    results.push(result)
+    const output: GuardrailOutput = await guardrail.process({
+      query: currentQuery,
+      original: query,
+      context,
+      metadata,
+    })
 
-    if (result.action === 'block') {
-      return { finalAction: 'block', results, sanitisedQuery: currentQuery }
+    if (output.annotations) {
+      allAnnotations.push(...output.annotations)
     }
 
-    if (result.action === 'redact' && result.sanitisedQuery) {
-      currentQuery = result.sanitisedQuery
+    if (output.metadata) {
+      metadata = { ...metadata, ...output.metadata }
+    }
+
+    if (output.action === 'block') {
+      return {
+        blocked: true,
+        query: currentQuery,
+        original: query,
+        reason: output.reason,
+        annotations: allAnnotations,
+        metadata,
+        filterCount: guardrails.length,
+      }
+    }
+
+    if (output.query) {
+      currentQuery = output.query
     }
   }
 
-  const wasRedacted = results.some(r => r.action === 'redact')
   return {
-    finalAction: wasRedacted ? 'redact' : 'pass',
-    results,
-    sanitisedQuery: currentQuery,
+    blocked: false,
+    query: currentQuery,
+    original: query,
+    annotations: allAnnotations,
+    metadata,
+    filterCount: guardrails.length,
   }
 }

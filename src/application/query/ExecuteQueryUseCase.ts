@@ -97,32 +97,31 @@ export class ExecuteQueryUseCase {
       })
     }
 
-    // ── Input guardrail screening ──
+    // ── Input guardrail pipeline ──
     let screeningAction: string | null = null
     let screeningCategories: string[] | null = null
     let screeningMs: number | null = null
     let queryToForward = query
 
     if (this.guardrails.length > 0) {
-      const screening = await runGuardrailChain(this.guardrails, query, {
+      const screenStart = Date.now()
+      const chain = await runGuardrailChain(this.guardrails, query, {
         workspaceId,
         userId: meta.userId,
         consumerType: meta.consumerType,
       })
+      screeningMs = Date.now() - screenStart
+      screeningCategories = chain.annotations.length > 0 ? chain.annotations : null
 
-      screeningAction = screening.finalAction
-      screeningCategories = screening.results.flatMap(r => r.detectedCategories)
-      screeningMs = screening.results.reduce((sum, r) => sum + r.durationMs, 0)
-
-      if (screening.finalAction === 'block') {
-        const blockResult = screening.results.find(r => r.action === 'block')
-        log.info({ workspace: workspaceId, categories: screeningCategories, source: blockResult?.source }, 'Query blocked by guardrail')
+      if (chain.blocked) {
+        screeningAction = 'block'
+        log.info({ workspace: workspaceId, annotations: chain.annotations }, 'Query blocked by guardrail')
 
         const auditLogId = generateId()
         await this.writeAuditLog(auditLogId, workspaceId, conversationId, query, this.buildInternalResult({ error: 'input_blocked', durationMs: Date.now() - startTime }), meta, { screeningAction, screeningCategories, screeningMs })
 
         return this.buildResult({
-          answer: blockResult?.message || 'This query was blocked by your organisation\'s input policy.',
+          answer: chain.reason || 'This query was blocked by your organisation\'s input policy.',
           error: 'input_blocked',
           durationMs: Date.now() - startTime,
           conversationId,
@@ -130,9 +129,10 @@ export class ExecuteQueryUseCase {
         })
       }
 
-      if (screening.finalAction === 'redact') {
-        queryToForward = screening.sanitisedQuery
-        log.info({ workspace: workspaceId, categories: screeningCategories }, 'Query redacted by guardrail')
+      if (chain.query !== query) {
+        screeningAction = 'modified'
+        queryToForward = chain.query
+        log.info({ workspace: workspaceId, annotations: chain.annotations }, 'Query modified by guardrail')
       }
     }
 

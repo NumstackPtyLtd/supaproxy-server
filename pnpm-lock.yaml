@@ -27,8 +27,8 @@ dependencies:
     specifier: 0.1.0
     version: 0.1.0(@slack/bolt@4.7.0)
   '@supaproxy/guardrails':
-    specifier: ^0.1.0
-    version: 0.1.0
+    specifier: ^0.2.0
+    version: 0.2.0
   '@supaproxy/providers':
     specifier: 0.1.0
     version: 0.1.0(@anthropic-ai/sdk@0.90.0)(openai@6.35.0)
@@ -887,8 +887,8 @@ packages:
       pino: 9.14.0
     dev: false
 
-  /@supaproxy/guardrails@0.1.0:
-    resolution: {integrity: sha512-mmGA8iwnd5Hn0AGi1vIYwHjhMDVjwqIMHUsOqMq3HudTpkIPeVYugXYtijWnMB4Xh7TI+JTud/MXipfbApTCUQ==}
+  /@supaproxy/guardrails@0.2.0:
+    resolution: {integrity: sha512-aBg0+TPBj5U+WR22DonMnC5k2nUocswgiTkdhP/cZnppAPZo8J8YWyqm13kGEgFw3lF+cNkFe2pM4QXbzBFxUA==}
     dev: false
 
   /@supaproxy/providers@0.1.0(@anthropic-ai/sdk@0.90.0)(openai@6.35.0):
