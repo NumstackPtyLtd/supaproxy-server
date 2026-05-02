@@ -3,8 +3,10 @@ import type { OrganisationRepository } from '../../domain/organisation/repositor
 import type { AuditLogRepository, AuditLogData } from '../../domain/audit/repository.js'
 import type { AIToolSpec, AIMessage, AIContentBlock, ProviderPlugin } from '@supaproxy/providers'
 import type { registry as ProviderRegistryType } from '@supaproxy/providers'
+import type { GuardrailPlugin } from '@supaproxy/guardrails'
 import type { McpClientFactory, McpConnection } from '../ports/McpClient.js'
 import type { ManageConversationUseCase } from '../conversation/ManageConversationUseCase.js'
+import { runGuardrailChain } from '../ports/guardrailChain.js'
 import { generateId } from '../../domain/shared/EntityId.js'
 import { NotFoundError, ConfigurationError } from '../../domain/shared/errors.js'
 import pino from 'pino'
@@ -64,6 +66,7 @@ export class ExecuteQueryUseCase {
     private readonly providerRegistry: typeof ProviderRegistryType,
     private readonly mcpFactory: McpClientFactory,
     private readonly conversationUseCase: ManageConversationUseCase,
+    private readonly guardrails: GuardrailPlugin[] = [],
   ) {}
 
   async execute(workspaceId: string, query: string, meta: QueryMeta): Promise<QueryResult> {
@@ -94,6 +97,45 @@ export class ExecuteQueryUseCase {
       })
     }
 
+    // ── Input guardrail screening ──
+    let screeningAction: string | null = null
+    let screeningCategories: string[] | null = null
+    let screeningMs: number | null = null
+    let queryToForward = query
+
+    if (this.guardrails.length > 0) {
+      const screening = await runGuardrailChain(this.guardrails, query, {
+        workspaceId,
+        userId: meta.userId,
+        consumerType: meta.consumerType,
+      })
+
+      screeningAction = screening.finalAction
+      screeningCategories = screening.results.flatMap(r => r.detectedCategories)
+      screeningMs = screening.results.reduce((sum, r) => sum + r.durationMs, 0)
+
+      if (screening.finalAction === 'block') {
+        const blockResult = screening.results.find(r => r.action === 'block')
+        log.info({ workspace: workspaceId, categories: screeningCategories, source: blockResult?.source }, 'Query blocked by guardrail')
+
+        const auditLogId = generateId()
+        await this.writeAuditLog(auditLogId, workspaceId, conversationId, query, this.buildInternalResult({ error: 'input_blocked', durationMs: Date.now() - startTime }), meta, { screeningAction, screeningCategories, screeningMs })
+
+        return this.buildResult({
+          answer: blockResult?.message || 'This query was blocked by your organisation\'s input policy.',
+          error: 'input_blocked',
+          durationMs: Date.now() - startTime,
+          conversationId,
+          sessionId,
+        })
+      }
+
+      if (screening.finalAction === 'redact') {
+        queryToForward = screening.sanitisedQuery
+        log.info({ workspace: workspaceId, categories: screeningCategories }, 'Query redacted by guardrail')
+      }
+    }
+
     const connections = await this.workspaceRepo.findConnectionConfigs(workspaceId)
     const { tools, mcpConnections } = await this.discoverTools(connections, workspaceId)
 
@@ -111,7 +153,7 @@ export class ExecuteQueryUseCase {
         throw new Error('No AI model configured for this workspace. Set a model in workspace settings.')
       }
 
-      const result = await this.runAgentLoop(query, provider, {
+      const result = await this.runAgentLoop(queryToForward, provider, {
         model: workspace.model,
         systemPrompt: workspace.system_prompt || 'You are a helpful assistant.',
         maxToolRounds: workspace.max_tool_rounds || 10,
@@ -124,8 +166,8 @@ export class ExecuteQueryUseCase {
       // Cost is accumulated per-round from the provider's usage.cost_usd
 
       const auditLogId = generateId()
-      await this.writeAuditLog(auditLogId, workspaceId, conversationId, query, result, meta)
-      await this.recordMessages(conversationId, query, result.answer, auditLogId)
+      await this.writeAuditLog(auditLogId, workspaceId, conversationId, query, result, meta, { screeningAction, screeningCategories, screeningMs })
+      await this.recordMessages(conversationId, queryToForward, result.answer, auditLogId)
 
       log.info({
         workspace: workspaceId,
@@ -281,6 +323,10 @@ export class ExecuteQueryUseCase {
     return result
   }
 
+  private buildInternalResult(overrides: Partial<{ toolsCalled: ToolCallRecord[]; connectionsHit: string[]; tokensInput: number; tokensOutput: number; costUsd: number; durationMs: number; error: string | null }> = {}) {
+    return { toolsCalled: [] as ToolCallRecord[], connectionsHit: [] as string[], tokensInput: 0, tokensOutput: 0, costUsd: 0, durationMs: 0, error: null as string | null, ...overrides }
+  }
+
   private async writeAuditLog(
     auditLogId: string,
     workspaceId: string,
@@ -288,6 +334,7 @@ export class ExecuteQueryUseCase {
     query: string,
     result: { toolsCalled: ToolCallRecord[]; connectionsHit: string[]; tokensInput: number; tokensOutput: number; costUsd: number; durationMs: number; error: string | null },
     meta: QueryMeta,
+    screening?: { screeningAction: string | null; screeningCategories: string[] | null; screeningMs: number | null },
   ): Promise<void> {
     try {
       const data: AuditLogData = {
@@ -306,6 +353,9 @@ export class ExecuteQueryUseCase {
         cost_usd: result.costUsd,
         duration_ms: result.durationMs,
         error: result.error,
+        input_screening_action: screening?.screeningAction || null,
+        input_screening_categories: screening?.screeningCategories ? JSON.stringify(screening.screeningCategories) : null,
+        input_screening_ms: screening?.screeningMs || null,
       }
       await this.auditRepo.create(data)
     } catch (err) {

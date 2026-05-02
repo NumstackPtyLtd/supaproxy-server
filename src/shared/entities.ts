@@ -56,6 +56,9 @@ export interface AuditLog {
   cost_usd: number;
   duration_ms: number;
   error: string | null;
+  input_screening_action: string | null;
+  input_screening_categories: string[] | null;
+  input_screening_ms: number | null;
   created_at: string;
 }
 
