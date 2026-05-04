@@ -53,6 +53,7 @@ interface WorkspaceRouteDeps {
   getConnectionsUseCase: GetConnectionsUseCase
   getKnowledgeUseCase: GetKnowledgeUseCase
   getComplianceUseCase: GetComplianceUseCase
+  listAvailableGuardrails: () => Array<{ id: string; name: string; description: string; stage: string; configSchema: { fields: Array<{ name: string; label: string; type: string; required?: boolean; placeholder?: string; helpText?: string; options?: Array<{ value: string; label: string }>; defaultValue?: string | boolean | number }> } }>
   orgRepo: OrganisationRepository
   workspaceRepo: WorkspaceRepository
   tenantService: TenantService
@@ -194,6 +195,50 @@ export function createWorkspaceRoutes(deps: WorkspaceRouteDeps) {
     await guardWorkspace(c.req.param('id'), user.org_id)
     const result = await deps.getDashboardUseCase.execute(c.req.param('id'))
     return c.json(result)
+  })
+
+  // ── Guardrails ──
+
+  workspaces.get('/api/workspaces/:id/guardrails', async (c) => {
+    const user = c.get('user') as AuthUser
+    const workspaceId = c.req.param('id')
+    await guardWorkspace(workspaceId, user.org_id)
+
+    const available = deps.listAvailableGuardrails()
+    const enabled = await deps.workspaceRepo.findEnabledGuardrailConfigs(workspaceId)
+    const enabledIds = new Set(enabled.map(e => e.guardrail_id))
+
+    const guardrails = available.map(g => ({
+      ...g,
+      enabled: enabledIds.has(g.id),
+      workspaceConfig: enabled.find(e => e.guardrail_id === g.id)?.config || null,
+    }))
+
+    return c.json({ guardrails })
+  })
+
+  workspaces.post('/api/workspaces/:id/guardrails/:guardrailId/enable', async (c) => {
+    const user = c.get('user') as AuthUser
+    const workspaceId = c.req.param('id')
+    const guardrailId = c.req.param('guardrailId')
+    await guardWorkspace(workspaceId, user.org_id)
+
+    const body = await c.req.json().catch(() => ({})) as { config?: string }
+    const { generateId } = await import('../../domain/shared/EntityId.js')
+    await deps.workspaceRepo.enableGuardrail(generateId(), workspaceId, guardrailId, body.config)
+
+    return c.json({ ok: true })
+  })
+
+  workspaces.post('/api/workspaces/:id/guardrails/:guardrailId/disable', async (c) => {
+    const user = c.get('user') as AuthUser
+    const workspaceId = c.req.param('id')
+    const guardrailId = c.req.param('guardrailId')
+    await guardWorkspace(workspaceId, user.org_id)
+
+    await deps.workspaceRepo.disableGuardrail(workspaceId, guardrailId)
+
+    return c.json({ ok: true })
   })
 
   return workspaces

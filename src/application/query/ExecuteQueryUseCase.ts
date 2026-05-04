@@ -66,7 +66,7 @@ export class ExecuteQueryUseCase {
     private readonly providerRegistry: typeof ProviderRegistryType,
     private readonly mcpFactory: McpClientFactory,
     private readonly conversationUseCase: ManageConversationUseCase,
-    private readonly guardrails: GuardrailPlugin[] = [],
+    private readonly resolveGuardrails: (workspaceId: string) => Promise<GuardrailPlugin[]> = async () => [],
   ) {}
 
   async execute(workspaceId: string, query: string, meta: QueryMeta): Promise<QueryResult> {
@@ -103,9 +103,11 @@ export class ExecuteQueryUseCase {
     let screeningMs: number | null = null
     let queryToForward = query
 
-    if (this.guardrails.length > 0) {
+    const guardrails = await this.resolveGuardrails(workspaceId)
+
+    if (guardrails.length > 0) {
       const screenStart = Date.now()
-      const chain = await runGuardrailChain(this.guardrails, query, {
+      const chain = await runGuardrailChain(guardrails, query, {
         workspaceId,
         userId: meta.userId,
         consumerType: meta.consumerType,

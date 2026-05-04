@@ -21,7 +21,7 @@ interface PermissionRow extends RowDataPacket, PermissionData {}
 interface StatsRow extends RowDataPacket, WorkspaceStatsData {}
 interface ActivityRow extends RowDataPacket, ActivityLogData {}
 interface BoundConsumerRow extends RowDataPacket { workspace_id: string; workspace_name: string }
-interface SlackConsumerRow extends RowDataPacket { workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }
+interface ConsumerRow extends RowDataPacket { workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }
 
 export class MysqlWorkspaceRepository implements WorkspaceRepository {
   constructor(private readonly pool: mysql.Pool) {}
@@ -198,9 +198,9 @@ export class MysqlWorkspaceRepository implements WorkspaceRepository {
     return rows[0] || null
   }
 
-  async findActiveSlackConsumers(): Promise<Array<{ workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }>> {
-    const [rows] = await this.pool.execute<SlackConsumerRow[]>(
-      'SELECT c.workspace_id, c.config, w.model, w.system_prompt, w.max_tool_rounds FROM consumers c JOIN workspaces w ON c.workspace_id = w.id WHERE c.type = "slack" AND w.status = "active"'
+  async findConsumersByType(type: string): Promise<Array<{ workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }>> {
+    const [rows] = await this.pool.execute<ConsumerRow[]>(
+      'SELECT c.workspace_id, c.config, w.model, w.system_prompt, w.max_tool_rounds FROM consumers c JOIN workspaces w ON c.workspace_id = w.id WHERE c.type = ? AND w.status = "active"', [type]
     )
     return rows
   }
@@ -217,6 +217,29 @@ export class MysqlWorkspaceRepository implements WorkspaceRepository {
       'SELECT id, rule_type, enabled, config FROM guardrails WHERE workspace_id = ?', [workspaceId]
     )
     return rows
+  }
+
+  async findEnabledGuardrailConfigs(workspaceId: string): Promise<Array<{ guardrail_id: string; config: string | null }>> {
+    const [rows] = await this.pool.execute<Array<mysql.RowDataPacket & { guardrail_id: string; config: string | null }>>(
+      'SELECT guardrail_id, config FROM workspace_guardrails WHERE workspace_id = ? AND enabled = TRUE', [workspaceId]
+    )
+    return rows.map(r => ({ guardrail_id: r.guardrail_id, config: r.config }))
+  }
+
+  async enableGuardrail(id: string, workspaceId: string, guardrailId: string, config?: string): Promise<void> {
+    await this.pool.execute(
+      `INSERT INTO workspace_guardrails (id, workspace_id, guardrail_id, enabled, config)
+       VALUES (?, ?, ?, TRUE, ?)
+       ON DUPLICATE KEY UPDATE enabled = TRUE, config = VALUES(config)`,
+      [id, workspaceId, guardrailId, config || null]
+    )
+  }
+
+  async disableGuardrail(workspaceId: string, guardrailId: string): Promise<void> {
+    await this.pool.execute(
+      'UPDATE workspace_guardrails SET enabled = FALSE WHERE workspace_id = ? AND guardrail_id = ?',
+      [workspaceId, guardrailId]
+    )
   }
 
   async findPermissions(workspaceId: string): Promise<PermissionData[]> {

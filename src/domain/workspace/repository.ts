@@ -134,10 +134,13 @@ export interface WorkspaceRepository {
   createConsumer(id: string, workspaceId: string, type: string, config: string): Promise<void>
   updateConsumerConfig(id: string, config: string): Promise<void>
   findConsumerBoundToChannel(type: string, excludeWorkspaceId: string, channelId: string): Promise<{ workspace_id: string; workspace_name: string } | null>
-  findActiveSlackConsumers(): Promise<Array<{ workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }>>
+  findConsumersByType(type: string): Promise<Array<{ workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }>>
 
   findKnowledge(workspaceId: string): Promise<KnowledgeSourceData[]>
   findGuardrails(workspaceId: string): Promise<GuardrailData[]>
+  findEnabledGuardrailConfigs(workspaceId: string): Promise<Array<{ guardrail_id: string; config: string | null }>>
+  enableGuardrail(id: string, workspaceId: string, guardrailId: string, config?: string): Promise<void>
+  disableGuardrail(workspaceId: string, guardrailId: string): Promise<void>
   findPermissions(workspaceId: string): Promise<PermissionData[]>
   getStats(workspaceId: string): Promise<WorkspaceStatsData>
 

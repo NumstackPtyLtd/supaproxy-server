@@ -10,10 +10,10 @@ import { MysqlModelRepository } from './infrastructure/persistence/mysql/MysqlMo
 import { BcryptPasswordService } from './infrastructure/auth/BcryptPasswordService.js'
 import { JwtTokenService } from './infrastructure/auth/JwtTokenService.js'
 import { registry as providerRegistry } from '@supaproxy/providers'
-import { registry as guardrailRegistry } from '@supaproxy/guardrails'
+import { PatternGuardrail, LlmGuardrail, type GuardrailPlugin } from '@supaproxy/guardrails'
 import { McpClientFactoryImpl } from './infrastructure/mcp/McpClientFactoryImpl.js'
 import { BullMqService } from './infrastructure/queue/BullMqService.js'
-import { SlackIntegrationTester } from './infrastructure/auth/SlackIntegrationTester.js'
+import { ConsumerIntegrationTester } from './infrastructure/auth/ConsumerIntegrationTester.js'
 import { ConsumerPosterRegistryImpl } from './infrastructure/consumers/ConsumerPosterRegistryImpl.js'
 import { NoOpTenantService } from './infrastructure/tenant/NoOpTenantService.js'
 import type { TenantService } from './application/ports/TenantService.js'
@@ -95,7 +95,7 @@ export function createContainer(pool: mysql.Pool, options?: { tenantService?: Te
   // dynamically from org settings at query time.
   const mcpFactory = new McpClientFactoryImpl()
   const queueService = new BullMqService(REDIS_HOST, REDIS_PORT)
-  const integrationTester = new SlackIntegrationTester()
+  const integrationTester = new ConsumerIntegrationTester(consumerRegistry)
   const posterRegistry = new ConsumerPosterRegistryImpl()
 
   // Middleware
@@ -161,7 +161,7 @@ export function createContainer(pool: mysql.Pool, options?: { tenantService?: Te
           onError: (err: Error) => log.error({ error: err.message }, 'Consumer error'),
           logger: log,
           getWorkspaceForChannel: async (channelId: string): Promise<Workspace | null> => {
-            const consumers = await workspaceRepo.findActiveSlackConsumers()
+            const consumers = await workspaceRepo.findConsumersByType(plugin.type)
             for (const row of consumers) {
               const cfg = typeof row.config === 'string' ? JSON.parse(row.config) : row.config
               if ((cfg.channels || []).includes(channelId)) {
@@ -173,29 +173,57 @@ export function createContainer(pool: mysql.Pool, options?: { tenantService?: Te
         }
         await plugin.start(ctx, credentials)
 
-        // Register poster for outbound messages
-        posterRegistry.register(plugin.type, async (target, text) => {
-          const threadTs = target.externalThreadId?.split(':')[1]
-          if (target.channel && threadTs) {
-            await plugin.sendMessage(target.channel, text, threadTs)
-          }
-        })
+        // Register poster for outbound messages if plugin supports it
+        if (plugin.sendMessage) {
+          const sendFn = plugin.sendMessage.bind(plugin)
+          posterRegistry.register(plugin.type, async (target, text) => {
+            const threadTs = target.externalThreadId?.split(':')[1]
+            if (target.channel && threadTs) {
+              await sendFn(target.channel, text, threadTs)
+            }
+          })
+        }
       },
     }
   }
   const connectConsumerUseCase = new ConnectConsumerUseCase(workspaceRepo, consumerTypeHandlers)
 
-  // Guardrails — built-in plugins from @supaproxy/guardrails registry.
-  // Additional guardrails can be added via marketplace plugins.
-  const guardrailPlugins = guardrailRegistry.byStage('pre-llm')
+  // Guardrails — resolved per workspace at query time.
+  // Only enabled guardrails run. Config is loaded from workspace_guardrails table.
+  const patternInstance = new PatternGuardrail()
+  const availableGuardrails: Record<string, { instance: GuardrailPlugin; factory: () => GuardrailPlugin }> = {
+    'pattern': { instance: patternInstance, factory: () => new PatternGuardrail() },
+  }
 
-  const executeQueryUseCase = new ExecuteQueryUseCase(workspaceRepo, orgRepo, auditRepo, providerRegistry, mcpFactory, manageConversationUseCase, guardrailPlugins)
+  async function resolveGuardrails(workspaceId: string): Promise<GuardrailPlugin[]> {
+    const configs = await workspaceRepo.findEnabledGuardrailConfigs(workspaceId)
+    const plugins: GuardrailPlugin[] = []
+    for (const { guardrail_id } of configs) {
+      const entry = availableGuardrails[guardrail_id]
+      if (entry) {
+        plugins.push(entry.factory())
+      }
+    }
+    return plugins
+  }
+
+  function listAvailableGuardrails() {
+    return Object.entries(availableGuardrails).map(([id, { instance }]) => ({
+      id,
+      name: instance.name,
+      description: instance.description,
+      stage: instance.stage,
+      configSchema: instance.configSchema,
+    }))
+  }
+
+  const executeQueryUseCase = new ExecuteQueryUseCase(workspaceRepo, orgRepo, auditRepo, providerRegistry, mcpFactory, manageConversationUseCase, resolveGuardrails)
   const manageQueuesUseCase = new ManageQueuesUseCase(queueService)
 
   // Build routes
   const authRoutes = createAuthRoutes({ signupUseCase, loginUseCase, tokenService, dashboardUrl: DASHBOARD_URL, isProduction: IS_PRODUCTION, cookieDomain: COOKIE_DOMAIN })
   const orgRoutes = createOrgRoutes({ getOrgUseCase, updateOrgUseCase, getOrgSettingsUseCase, updateOrgSettingUseCase, testIntegrationUseCase, listOrgUsersUseCase, orgRepo, requireAuth })
-  const workspaceRoutes = createWorkspaceRoutes({ createWorkspaceUseCase, updateWorkspaceUseCase, getWorkspaceDetailUseCase, listWorkspacesUseCase, getWorkspaceSummaryUseCase, getDashboardUseCase, getActivityUseCase, deleteConnectionUseCase, getConnectionsUseCase, getKnowledgeUseCase, getComplianceUseCase, orgRepo, workspaceRepo, tenantService, requireAuth })
+  const workspaceRoutes = createWorkspaceRoutes({ createWorkspaceUseCase, updateWorkspaceUseCase, getWorkspaceDetailUseCase, listWorkspacesUseCase, getWorkspaceSummaryUseCase, getDashboardUseCase, getActivityUseCase, deleteConnectionUseCase, getConnectionsUseCase, getKnowledgeUseCase, getComplianceUseCase, listAvailableGuardrails, orgRepo, workspaceRepo, tenantService, requireAuth })
   const conversationRoutes = createConversationRoutes({ listConversationsUseCase, getConversationDetailUseCase, closeConversationUseCase, workspaceRepo, tenantService, requireAuth })
   const connectorRoutes = createConnectorRoutes({ testMcpConnectionUseCase, saveMcpConnectionUseCase, bindConsumerChannelUseCase, connectConsumerUseCase, workspaceRepo, tenantService, requireAuth })
   const queryRoutes = createQueryRoutes({ executeQueryUseCase, workspaceRepo, tenantService, requireAuth })

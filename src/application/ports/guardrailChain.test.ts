@@ -48,6 +48,7 @@ describe('runGuardrailChain', () => {
       name: 'Upper',
       description: 'test',
       stage: 'pre-llm',
+      configSchema: { fields: [] }, version: '1.0.0', author: 'test',
       async process(input: GuardrailInput): Promise<GuardrailOutput> {
         return { action: 'continue', query: input.query.toUpperCase(), annotations: ['uppercased'] }
       },
@@ -66,6 +67,7 @@ describe('runGuardrailChain', () => {
       name: 'Blocker',
       description: 'test',
       stage: 'pre-llm',
+      configSchema: { fields: [] }, version: '1.0.0', author: 'test',
       async process(): Promise<GuardrailOutput> {
         return { action: 'block', reason: 'Blocked by test', annotations: ['test-blocked'] }
       },
@@ -75,6 +77,7 @@ describe('runGuardrailChain', () => {
       name: 'Never',
       description: 'test',
       stage: 'pre-llm',
+      configSchema: { fields: [] }, version: '1.0.0', author: 'test',
       async process(): Promise<GuardrailOutput> {
         throw new Error('Should not be called')
       },
@@ -95,13 +98,13 @@ describe('runGuardrailChain', () => {
 
   it('metadata accumulates through the chain', async () => {
     const filter1: GuardrailPlugin = {
-      id: 'f1', name: 'F1', description: 'test', stage: 'pre-llm',
+      id: 'f1', name: 'F1', description: 'test', stage: 'pre-llm', configSchema: { fields: [] }, version: '1.0.0', author: 'test',
       async process(): Promise<GuardrailOutput> {
         return { action: 'continue', metadata: { scanned: true } }
       },
     }
     const filter2: GuardrailPlugin = {
-      id: 'f2', name: 'F2', description: 'test', stage: 'pre-llm',
+      id: 'f2', name: 'F2', description: 'test', stage: 'pre-llm', configSchema: { fields: [] }, version: '1.0.0', author: 'test',
       async process(input: GuardrailInput): Promise<GuardrailOutput> {
         return { action: 'continue', metadata: { previousScanned: input.metadata.scanned } }
       },
@@ -115,7 +118,7 @@ describe('runGuardrailChain', () => {
 
   it('original query is always preserved', async () => {
     const replacer: GuardrailPlugin = {
-      id: 'replacer', name: 'Replacer', description: 'test', stage: 'pre-llm',
+      id: 'replacer', name: 'Replacer', description: 'test', stage: 'pre-llm', configSchema: { fields: [] }, version: '1.0.0', author: 'test',
       async process(): Promise<GuardrailOutput> {
         return { action: 'continue', query: 'completely different query' }
       },

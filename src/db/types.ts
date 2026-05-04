@@ -62,7 +62,7 @@ export interface ConnectionToolRow extends RowDataPacket {
 export interface ConsumerRow extends RowDataPacket {
   id: string
   workspace_id: string
-  type: 'slack' | 'api' | 'claude-code' | 'whatsapp'
+  type: string
   config: string
   status: 'active' | 'inactive'
   created_at: string

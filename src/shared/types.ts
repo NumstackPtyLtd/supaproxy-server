@@ -123,7 +123,7 @@ export function hasPermission(
 export interface AuditEntry {
   timestamp: string
   workspace_id: string
-  consumer: 'slack' | 'api' | 'web'
+  consumer: string
   channel?: string
   user_id: string
   user_name?: string

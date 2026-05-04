@@ -173,7 +173,7 @@ const migrations: Migration[] = [
         CREATE TABLE IF NOT EXISTS consumers (
           id VARCHAR(64) PRIMARY KEY,
           workspace_id VARCHAR(64) NOT NULL,
-          type ENUM('slack', 'api', 'claude-code', 'whatsapp') NOT NULL,
+          type VARCHAR(50) NOT NULL,
           config JSON NOT NULL,
           status ENUM('active', 'inactive') DEFAULT 'active',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -410,6 +410,32 @@ const migrations: Migration[] = [
         ADD COLUMN input_screening_categories TEXT NULL,
         ADD COLUMN input_screening_ms INT NULL
       `);
+    },
+  },
+  {
+    version: 11,
+    name: 'workspace guardrails table',
+    up: async (pool) => {
+      await pool.execute(`
+        CREATE TABLE IF NOT EXISTS workspace_guardrails (
+          id VARCHAR(64) PRIMARY KEY,
+          workspace_id VARCHAR(64) NOT NULL,
+          guardrail_id VARCHAR(100) NOT NULL,
+          enabled BOOLEAN DEFAULT TRUE,
+          config JSON NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_workspace_guardrail (workspace_id, guardrail_id),
+          FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+        )
+      `);
+    },
+  },
+  {
+    version: 12,
+    name: 'consumer type enum to varchar',
+    up: async (pool) => {
+      await pool.execute(`ALTER TABLE consumers MODIFY COLUMN type VARCHAR(50) NOT NULL`);
     },
   },
 ];
