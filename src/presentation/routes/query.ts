@@ -10,6 +10,13 @@ import { NotFoundError } from '../../domain/shared/errors.js'
 const queryBodySchema = z.object({
   query: z.string().min(1, 'Query is required').max(10000),
   session_id: z.string().max(255).optional(),
+  consumer_type: z.string().max(50).optional(),
+  consumer_context: z.object({
+    channel: z.string().max(255).optional(),
+    userId: z.string().max(255).optional(),
+    userName: z.string().max(255).optional(),
+    threadId: z.string().max(255).optional(),
+  }).optional(),
   history: z.array(z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),
@@ -42,10 +49,12 @@ export function createQueryRoutes(deps: QueryRouteDeps) {
     await guardWorkspace(wsId, user.org_id)
 
     try {
+      const ctx = parsed.data.consumer_context
       const result = await deps.executeQueryUseCase.execute(wsId, parsed.data.query, {
-        consumerType: 'api',
-        userId: user?.id,
-        userName: user?.name,
+        consumerType: parsed.data.consumer_type || 'api',
+        channel: ctx?.channel,
+        userId: ctx?.userId || user?.id,
+        userName: ctx?.userName || user?.name,
         sessionId: parsed.data.session_id,
       })
 

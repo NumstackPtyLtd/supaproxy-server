@@ -11,10 +11,10 @@ interface TestResult {
 export class TestMcpConnectionUseCase {
   constructor(private readonly mcpFactory: McpClientFactory) {}
 
-  async execute(transport: string, url?: string, command?: string): Promise<TestResult> {
+  async execute(transport: string, url?: string, command?: string, headers?: Record<string, string>): Promise<TestResult> {
     if (transport === 'http') {
       if (!url) return { ok: false, error: 'Server URL is required' }
-      return this.mcpFactory.testHttp(url)
+      return this.mcpFactory.testHttp(url, headers)
     }
     return { ok: false, error: 'STDIO connections are tested on first query.' }
   }

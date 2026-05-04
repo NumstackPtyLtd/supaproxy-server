@@ -120,9 +120,9 @@ export class McpClientFactoryImpl implements McpClientFactory {
     return new StdioMcpConnection(client, transport, tools)
   }
 
-  async testHttp(url: string): Promise<{ ok: boolean; tools: number; server: string; toolNames: string[]; error?: string }> {
+  async testHttp(url: string, extraHeaders?: Record<string, string>): Promise<{ ok: boolean; tools: number; server: string; toolNames: string[]; error?: string }> {
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extraHeaders }
       const initResult = await this.httpRequest(url, 'initialize', {
         protocolVersion: '2024-11-05',
         capabilities: {},
