@@ -109,7 +109,6 @@ export function mockWorkspaceRepo(): WorkspaceRepository {
     createConsumer: vi.fn().mockResolvedValue(undefined),
     updateConsumerConfig: vi.fn().mockResolvedValue(undefined),
     findConsumerBoundToChannel: vi.fn().mockResolvedValue(null),
-    findActiveSlackConsumers: vi.fn().mockResolvedValue([]),
     findConsumersByType: vi.fn().mockResolvedValue([]),
     findKnowledge: vi.fn().mockResolvedValue([]),
     findGuardrails: vi.fn().mockResolvedValue([]),

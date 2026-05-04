@@ -161,7 +161,7 @@ export function createContainer(pool: mysql.Pool, options?: { tenantService?: Te
           onError: (err: Error) => log.error({ error: err.message }, 'Consumer error'),
           logger: log,
           getWorkspaceForChannel: async (channelId: string): Promise<Workspace | null> => {
-            const consumers = await workspaceRepo.findActiveSlackConsumers()
+            const consumers = await workspaceRepo.findConsumersByType(plugin.type)
             for (const row of consumers) {
               const cfg = typeof row.config === 'string' ? JSON.parse(row.config) : row.config
               if ((cfg.channels || []).includes(channelId)) {

@@ -21,7 +21,7 @@ interface PermissionRow extends RowDataPacket, PermissionData {}
 interface StatsRow extends RowDataPacket, WorkspaceStatsData {}
 interface ActivityRow extends RowDataPacket, ActivityLogData {}
 interface BoundConsumerRow extends RowDataPacket { workspace_id: string; workspace_name: string }
-interface SlackConsumerRow extends RowDataPacket { workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }
+interface ConsumerRow extends RowDataPacket { workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }
 
 export class MysqlWorkspaceRepository implements WorkspaceRepository {
   constructor(private readonly pool: mysql.Pool) {}
@@ -198,12 +198,8 @@ export class MysqlWorkspaceRepository implements WorkspaceRepository {
     return rows[0] || null
   }
 
-  async findActiveSlackConsumers(): Promise<Array<{ workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }>> {
-    return this.findConsumersByType('slack')
-  }
-
   async findConsumersByType(type: string): Promise<Array<{ workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }>> {
-    const [rows] = await this.pool.execute<SlackConsumerRow[]>(
+    const [rows] = await this.pool.execute<ConsumerRow[]>(
       'SELECT c.workspace_id, c.config, w.model, w.system_prompt, w.max_tool_rounds FROM consumers c JOIN workspaces w ON c.workspace_id = w.id WHERE c.type = ? AND w.status = "active"', [type]
     )
     return rows
