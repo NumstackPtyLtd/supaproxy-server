@@ -199,8 +199,12 @@ export class MysqlWorkspaceRepository implements WorkspaceRepository {
   }
 
   async findActiveSlackConsumers(): Promise<Array<{ workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }>> {
+    return this.findConsumersByType('slack')
+  }
+
+  async findConsumersByType(type: string): Promise<Array<{ workspace_id: string; config: string; model: string; system_prompt: string | null; max_tool_rounds: number }>> {
     const [rows] = await this.pool.execute<SlackConsumerRow[]>(
-      'SELECT c.workspace_id, c.config, w.model, w.system_prompt, w.max_tool_rounds FROM consumers c JOIN workspaces w ON c.workspace_id = w.id WHERE c.type = "slack" AND w.status = "active"'
+      'SELECT c.workspace_id, c.config, w.model, w.system_prompt, w.max_tool_rounds FROM consumers c JOIN workspaces w ON c.workspace_id = w.id WHERE c.type = ? AND w.status = "active"', [type]
     )
     return rows
   }

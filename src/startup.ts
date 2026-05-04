@@ -10,13 +10,36 @@ import type { IncomingMessage, Workspace } from '@supaproxy/consumers'
 
 const log = pino({ name: 'startup' })
 
+/**
+ * Auto-start all registered consumers that have org-level credentials configured.
+ * Iterates the plugin registry — no consumer-specific logic here.
+ */
 export async function startConsumers(container: Container): Promise<void> {
-  try {
-    const botToken = await container.orgRepo.getSettingValue('slack_bot_token')
-    const appToken = await container.orgRepo.getSettingValue('slack_app_token')
+  for (const plugin of container.consumerRegistry.list()) {
+    if (!plugin.capabilities.orgCredentials) continue
 
-    if (botToken && appToken && container.consumerRegistry.has('slack')) {
-      const plugin = container.consumerRegistry.get('slack')
+    try {
+      // Collect credentials from org settings using the plugin's configSchema
+      const credentials: Record<string, string> = {}
+      let hasAll = true
+
+      for (const field of plugin.configSchema.fields) {
+        if (field.type !== 'password') continue
+        const key = `${plugin.type}_${field.name}`
+        const value = await container.orgRepo.getSettingValue(key)
+        if (value) {
+          credentials[field.name] = value
+        } else if (field.required) {
+          hasAll = false
+          break
+        }
+      }
+
+      if (!hasAll) {
+        log.info({ type: plugin.type }, `${plugin.name} not configured — set credentials in Settings > Integrations`)
+        continue
+      }
+
       await plugin.start({
         onMessage: async (msg: IncomingMessage) => {
           const result = await container.executeQueryUseCase.execute(msg.channel, msg.query, {
@@ -28,28 +51,30 @@ export async function startConsumers(container: Container): Promise<void> {
           })
           return { answer: result.answer, conversationId: result.conversationId || '' }
         },
-        onError: (err: Error) => log.error({ error: err.message }, 'Consumer error'),
+        onError: (err: Error) => log.error({ type: plugin.type, error: err.message }, 'Consumer error'),
         logger: log,
         getWorkspaceForChannel: async (channelId: string): Promise<Workspace | null> => {
-          const consumers = await container.workspaceRepo.findActiveSlackConsumers()
+          const consumers = await container.workspaceRepo.findConsumersByType(plugin.type)
           for (const row of consumers) {
             const cfg = typeof row.config === 'string' ? JSON.parse(row.config) : row.config
             if ((cfg.channels || []).includes(channelId)) return { id: row.workspace_id, name: '' }
           }
           return null
         },
-      }, { bot_token: botToken, app_token: appToken })
+      }, credentials)
 
-      container.posterRegistry.register('slack', async (target, text) => {
-        const threadTs = target.externalThreadId?.split(':')[1]
-        if (target.channel && threadTs) await plugin.sendMessage(target.channel, text, threadTs)
-      })
-      log.info('Slack consumer started via plugin')
-    } else {
-      log.info('Slack bot not configured — set tokens in Settings > Integrations')
+      if (plugin.sendMessage) {
+        const sendFn = plugin.sendMessage.bind(plugin)
+        container.posterRegistry.register(plugin.type, async (target, text) => {
+          const threadTs = target.externalThreadId?.split(':')[1]
+          if (target.channel && threadTs) await sendFn(target.channel, text, threadTs)
+        })
+      }
+
+      log.info({ type: plugin.type }, `${plugin.name} consumer started`)
+    } catch (err) {
+      log.warn({ type: plugin.type, error: (err as Error).message }, `${plugin.name} consumer failed — server continues without it`)
     }
-  } catch (err) {
-    log.warn({ error: (err as Error).message }, 'Slack consumer failed — server continues without it')
   }
 }
 

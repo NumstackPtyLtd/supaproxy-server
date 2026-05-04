@@ -24,11 +24,11 @@ dependencies:
     specifier: ^4.2.0
     version: 4.7.0(@types/express@5.0.6)
   '@supaproxy/consumers':
-    specifier: 0.1.0
-    version: 0.1.0(@slack/bolt@4.7.0)
+    specifier: ^0.2.0
+    version: 0.2.0(@slack/bolt@4.7.0)
   '@supaproxy/guardrails':
-    specifier: link:/Users/Elvis/workspace/supaproxyhq/supaproxy-guardrails
-    version: link:../supaproxy-guardrails
+    specifier: ^0.2.1
+    version: 0.2.1
   '@supaproxy/providers':
     specifier: 0.1.0
     version: 0.1.0(@anthropic-ai/sdk@0.90.0)(openai@6.35.0)
@@ -875,8 +875,8 @@ packages:
       - debug
     dev: false
 
-  /@supaproxy/consumers@0.1.0(@slack/bolt@4.7.0):
-    resolution: {integrity: sha512-v85YOvyG/If75NowSKkyz/U2F4chYkNApmp/dFhK8awYYrozha9ZwX2Q6CqGil0fHzvIdReCS7cf6W/wHkXH0A==}
+  /@supaproxy/consumers@0.2.0(@slack/bolt@4.7.0):
+    resolution: {integrity: sha512-guvao9QAoMOpDRIPA/eIJwvCmJSP9cw27ueFSbW6Y8s0A1lWbcXAAlmAuIphqOeb5l4ub68JSffGOtz7wisbOA==}
     peerDependencies:
       '@slack/bolt': ^4.0.0
     peerDependenciesMeta:
@@ -885,6 +885,10 @@ packages:
     dependencies:
       '@slack/bolt': 4.7.0(@types/express@5.0.6)
       pino: 9.14.0
+    dev: false
+
+  /@supaproxy/guardrails@0.2.1:
+    resolution: {integrity: sha512-Wh389XaCLPzTonlD4YLmrlq0LHz7sFl9D+Vm2YMIspVtfEHC3Ek8R7Red/UNS6iwJ/5kGPHVPEE360mn8BPzZg==}
     dev: false
 
   /@supaproxy/providers@0.1.0(@anthropic-ai/sdk@0.90.0)(openai@6.35.0):

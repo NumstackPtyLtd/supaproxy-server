@@ -173,13 +173,16 @@ export function createContainer(pool: mysql.Pool, options?: { tenantService?: Te
         }
         await plugin.start(ctx, credentials)
 
-        // Register poster for outbound messages
-        posterRegistry.register(plugin.type, async (target, text) => {
-          const threadTs = target.externalThreadId?.split(':')[1]
-          if (target.channel && threadTs) {
-            await plugin.sendMessage(target.channel, text, threadTs)
-          }
-        })
+        // Register poster for outbound messages if plugin supports it
+        if (plugin.sendMessage) {
+          const sendFn = plugin.sendMessage.bind(plugin)
+          posterRegistry.register(plugin.type, async (target, text) => {
+            const threadTs = target.externalThreadId?.split(':')[1]
+            if (target.channel && threadTs) {
+              await sendFn(target.channel, text, threadTs)
+            }
+          })
+        }
       },
     }
   }
