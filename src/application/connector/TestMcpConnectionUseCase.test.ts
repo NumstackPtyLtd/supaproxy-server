@@ -12,7 +12,7 @@ describe('TestMcpConnectionUseCase', () => {
     const uc = new TestMcpConnectionUseCase(factory)
     const result = await uc.execute('http', 'http://localhost:8080')
 
-    expect(factory.testHttp).toHaveBeenCalledWith('http://localhost:8080')
+    expect(factory.testHttp).toHaveBeenCalledWith('http://localhost:8080', undefined)
     expect(result).toEqual(testResult)
   })
 

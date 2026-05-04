@@ -15,8 +15,8 @@ const log = pino({ name: 'routes/connectors' })
 
 const slackChannelSchema = z.object({ workspace_id: z.string().min(1).max(255), channel_id: z.string().min(1).max(100), channel_name: z.string().max(255).optional() })
 const slackConnectSchema = z.object({ workspace_id: z.string().min(1).max(255), bot_token: z.string().min(1).max(500), app_token: z.string().min(1).max(500), channel_id: z.string().max(100).optional() })
-const mcpTestSchema = z.object({ transport: z.enum(['http', 'stdio']).optional(), url: z.string().url().max(2048).optional(), command: z.string().max(1000).optional() })
-const mcpSaveSchema = z.object({ workspace_id: z.string().min(1).max(255), name: z.string().min(1).max(255), transport: z.enum(['http', 'stdio']).optional(), url: z.string().url().max(2048).optional(), command: z.string().max(1000).optional(), args: z.array(z.string().max(1000)).max(50).optional() })
+const mcpTestSchema = z.object({ transport: z.enum(['http', 'stdio']).optional(), url: z.string().url().max(2048).optional(), command: z.string().max(1000).optional(), headers: z.record(z.string().max(2000)).optional() })
+const mcpSaveSchema = z.object({ workspace_id: z.string().min(1).max(255), name: z.string().min(1).max(255), transport: z.enum(['http', 'stdio']).optional(), url: z.string().url().max(2048).optional(), command: z.string().max(1000).optional(), args: z.array(z.string().max(1000)).max(50).optional(), headers: z.record(z.string().max(2000)).optional(), env: z.record(z.string().max(2000)).optional() })
 const consumerChannelSchema = z.object({ type: z.string().min(1), workspace_id: z.string().min(1).max(255), channel_id: z.string().min(1).max(100), channel_name: z.string().max(255).optional() })
 const consumerConnectSchema = z.object({ type: z.string().min(1), workspace_id: z.string().min(1).max(255), credentials: z.record(z.string().max(500)), channel_id: z.string().max(100).optional() })
 
@@ -119,7 +119,7 @@ export function createConnectorRoutes(deps: ConnectorRouteDeps) {
     const result = await parseBody(c, mcpTestSchema)
     if (!result.success) return result.response
     const transport = result.data.transport || (result.data.url ? 'http' : 'stdio')
-    const output = await deps.testMcpConnectionUseCase.execute(transport, result.data.url, result.data.command)
+    const output = await deps.testMcpConnectionUseCase.execute(transport, result.data.url, result.data.command, result.data.headers)
     return c.json(output)
   })
 
@@ -136,6 +136,8 @@ export function createConnectorRoutes(deps: ConnectorRouteDeps) {
         url: result.data.url,
         command: result.data.command,
         args: result.data.args,
+        headers: result.data.headers,
+        env: result.data.env,
       })
       return c.json(output)
     } catch (err) { return handleDomainError(c, err) }
