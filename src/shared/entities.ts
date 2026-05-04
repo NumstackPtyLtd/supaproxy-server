@@ -6,7 +6,7 @@
 // ── Conversation lifecycle ──
 
 export type ConversationStatus = 'open' | 'cold' | 'closed';
-export type ConsumerType = 'slack' | 'api' | 'whatsapp' | 'claude-code';
+export type ConsumerType = string;
 export type ResolutionStatus = 'resolved' | 'unresolved' | 'escalated' | 'abandoned';
 export type ConversationCategory = 'query' | 'issue' | 'sales' | 'feedback' | 'support' | 'internal' | 'other';
 export type StatsStatus = 'pending' | 'complete' | 'failed';

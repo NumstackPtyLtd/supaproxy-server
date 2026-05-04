@@ -112,12 +112,6 @@ const McpTestResponse = z.object({
   error: z.string().optional(),
 }).openapi('McpTestResponse')
 
-const SlackTestResponse = z.object({
-  bot_name: z.string().optional(),
-  team: z.string().optional(),
-  error: z.string().optional(),
-}).openapi('SlackTestResponse')
-
 const HealthResponse = z.object({
   status: z.string(),
   setup_complete: z.boolean(),
@@ -204,19 +198,6 @@ const McpSaveBody = z.object({
   command: z.string().max(1000).optional(),
   args: z.array(z.string()).max(50).optional(),
 }).openapi('McpSaveBody')
-
-const SlackChannelBody = z.object({
-  workspace_id: z.string().min(1).max(255),
-  channel_id: z.string().min(1).max(100),
-  channel_name: z.string().max(255).optional(),
-}).openapi('SlackChannelBody')
-
-const SlackConnectorBody = z.object({
-  workspace_id: z.string().min(1).max(255),
-  bot_token: z.string().min(1).max(500),
-  app_token: z.string().min(1).max(500),
-  channel_id: z.string().max(100).optional(),
-}).openapi('SlackConnectorBody')
 
 // ── OpenAPI spec app ──────────────────────────────────────────────
 
@@ -310,13 +291,6 @@ docs.openapi(createRoute({
   responses: { 200: { description: 'Updated', content: { 'application/json': { schema: OkResponse } } } },
 }), (c) => c.json({} as never))
 
-docs.openapi(createRoute({
-  method: 'post', path: '/api/org/integrations/slack/test', tags: tag('Organisation'),
-  summary: 'Test Slack bot token',
-  security: [{ cookieAuth: [] }],
-  request: { body: { content: { 'application/json': { schema: z.object({ bot_token: z.string().min(1).max(500) }) } } } },
-  responses: { 200: { description: 'Test result', content: { 'application/json': { schema: SlackTestResponse } } } },
-}), (c) => c.json({} as never))
 
 docs.openapi(createRoute({
   method: 'get', path: '/api/org/users', tags: tag('Organisation'),
@@ -527,19 +501,6 @@ docs.openapi(createRoute({
   },
 }), (c) => c.json({} as never))
 
-docs.openapi(createRoute({
-  method: 'post', path: '/api/connectors/slack-channel', tags: tag('Connectors'),
-  summary: 'Bind a Slack channel to a workspace',
-  request: { body: { content: { 'application/json': { schema: SlackChannelBody } } } },
-  responses: { 200: { description: 'Saved', content: { 'application/json': { schema: z.object({ status: z.literal('saved'), message: z.string() }) } } } },
-}), (c) => c.json({} as never))
-
-docs.openapi(createRoute({
-  method: 'post', path: '/api/connectors/slack', tags: tag('Connectors'),
-  summary: 'Connect Slack bot to a workspace',
-  request: { body: { content: { 'application/json': { schema: SlackConnectorBody } } } },
-  responses: { 200: { description: 'Connected', content: { 'application/json': { schema: z.object({ status: z.string(), message: z.string() }) } } } },
-}), (c) => c.json({} as never))
 
 // --- Query ---
 
@@ -575,11 +536,11 @@ docs.doc('/api/openapi.json', {
     { name: 'Queues', description: 'BullMQ job queue management' },
     { name: 'Workspaces', description: 'Workspace CRUD, dashboard, and activity' },
     { name: 'Connections', description: 'MCP and external connections' },
-    { name: 'Consumers', description: 'Message consumer bindings (Slack, API, etc.)' },
+    { name: 'Consumers', description: 'Message consumer bindings' },
     { name: 'Knowledge', description: 'Knowledge sources and gap detection' },
     { name: 'Compliance', description: 'Guardrails and violation tracking' },
     { name: 'Conversations', description: 'Conversation lifecycle, messages, and analytics' },
-    { name: 'Connectors', description: 'Connect MCP servers and Slack bots' },
+    { name: 'Connectors', description: 'Connect MCP servers and consumer channels' },
     { name: 'Query', description: 'Send queries to workspace agents' },
   ],
   security: [],

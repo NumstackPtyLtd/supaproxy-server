@@ -173,7 +173,7 @@ const migrations: Migration[] = [
         CREATE TABLE IF NOT EXISTS consumers (
           id VARCHAR(64) PRIMARY KEY,
           workspace_id VARCHAR(64) NOT NULL,
-          type ENUM('slack', 'api', 'claude-code', 'whatsapp') NOT NULL,
+          type VARCHAR(50) NOT NULL,
           config JSON NOT NULL,
           status ENUM('active', 'inactive') DEFAULT 'active',
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -429,6 +429,13 @@ const migrations: Migration[] = [
           FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
         )
       `);
+    },
+  },
+  {
+    version: 12,
+    name: 'consumer type enum to varchar',
+    up: async (pool) => {
+      await pool.execute(`ALTER TABLE consumers MODIFY COLUMN type VARCHAR(50) NOT NULL`);
     },
   },
 ];

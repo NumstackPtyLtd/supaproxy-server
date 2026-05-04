@@ -13,7 +13,7 @@ import { registry as providerRegistry } from '@supaproxy/providers'
 import { PatternGuardrail, LlmGuardrail, type GuardrailPlugin } from '@supaproxy/guardrails'
 import { McpClientFactoryImpl } from './infrastructure/mcp/McpClientFactoryImpl.js'
 import { BullMqService } from './infrastructure/queue/BullMqService.js'
-import { SlackIntegrationTester } from './infrastructure/auth/SlackIntegrationTester.js'
+import { ConsumerIntegrationTester } from './infrastructure/auth/ConsumerIntegrationTester.js'
 import { ConsumerPosterRegistryImpl } from './infrastructure/consumers/ConsumerPosterRegistryImpl.js'
 import { NoOpTenantService } from './infrastructure/tenant/NoOpTenantService.js'
 import type { TenantService } from './application/ports/TenantService.js'
@@ -95,7 +95,7 @@ export function createContainer(pool: mysql.Pool, options?: { tenantService?: Te
   // dynamically from org settings at query time.
   const mcpFactory = new McpClientFactoryImpl()
   const queueService = new BullMqService(REDIS_HOST, REDIS_PORT)
-  const integrationTester = new SlackIntegrationTester()
+  const integrationTester = new ConsumerIntegrationTester(consumerRegistry)
   const posterRegistry = new ConsumerPosterRegistryImpl()
 
   // Middleware

@@ -13,8 +13,6 @@ import { NotFoundError, ConflictError, ValidationError } from '../../domain/shar
 
 const log = pino({ name: 'routes/connectors' })
 
-const slackChannelSchema = z.object({ workspace_id: z.string().min(1).max(255), channel_id: z.string().min(1).max(100), channel_name: z.string().max(255).optional() })
-const slackConnectSchema = z.object({ workspace_id: z.string().min(1).max(255), bot_token: z.string().min(1).max(500), app_token: z.string().min(1).max(500), channel_id: z.string().max(100).optional() })
 const mcpTestSchema = z.object({ transport: z.enum(['http', 'stdio']).optional(), url: z.string().url().max(2048).optional(), command: z.string().max(1000).optional(), headers: z.record(z.string().max(2000)).optional() })
 const mcpSaveSchema = z.object({ workspace_id: z.string().min(1).max(255), name: z.string().min(1).max(255), transport: z.enum(['http', 'stdio']).optional(), url: z.string().url().max(2048).optional(), command: z.string().max(1000).optional(), args: z.array(z.string().max(1000)).max(50).optional(), headers: z.record(z.string().max(2000)).optional(), env: z.record(z.string().max(2000)).optional() })
 const consumerChannelSchema = z.object({ type: z.string().min(1), workspace_id: z.string().min(1).max(255), channel_id: z.string().min(1).max(100), channel_name: z.string().max(255).optional() })
@@ -81,38 +79,6 @@ export function createConnectorRoutes(deps: ConnectorRouteDeps) {
       if (err instanceof NotFoundError) return c.json({ error: err.message }, 404)
       return c.json({ error: (err as Error).message }, 400)
     }
-  })
-
-  connectors.post('/api/connectors/slack-channel', async (c) => {
-    const result = await parseBody(c, slackChannelSchema)
-    if (!result.success) return result.response
-    const user = c.get('user') as AuthUser
-    await guardWorkspace(result.data.workspace_id, user.org_id)
-    try {
-      const output = await deps.bindConsumerChannelUseCase.execute({
-        type: 'slack',
-        workspaceId: result.data.workspace_id,
-        channelId: result.data.channel_id,
-        channelName: result.data.channel_name,
-      })
-      return c.json({ status: 'ok', message: output.message })
-    } catch (err) { return handleDomainError(c, err) }
-  })
-
-  connectors.post('/api/connectors/slack', async (c) => {
-    const result = await parseBody(c, slackConnectSchema)
-    if (!result.success) return result.response
-    const user = c.get('user') as AuthUser
-    await guardWorkspace(result.data.workspace_id, user.org_id)
-    try {
-      const output = await deps.connectConsumerUseCase.execute({
-        type: 'slack',
-        workspaceId: result.data.workspace_id,
-        credentials: { bot_token: result.data.bot_token, app_token: result.data.app_token },
-        channelId: result.data.channel_id,
-      })
-      return c.json({ status: 'ok', message: output.message })
-    } catch (err) { return handleDomainError(c, err) }
   })
 
   connectors.post('/api/connectors/mcp/test', async (c) => {
